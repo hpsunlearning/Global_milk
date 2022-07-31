@@ -46,7 +46,7 @@ alpha_diversity_bootstrap <- function(asv_count_df, phylotree, depth, n=100){
       boot_asv <- sample(all_asv_count, size = depth, replace = T)
       boot_dat <- table(boot_asv) %>% as.matrix() 
       colnames(boot_dat) <- "count"
-      faith <- pd(t(boot_dat), phylotree, include.root = F)$PD
+      faith <- pd(t(boot_dat), phylotree, include.root = T)$PD
       observed <- nrow(boot_dat)
       shannon <- diversity(boot_dat, index = "shannon")
       evenness <- shannon/log(observed)
@@ -264,8 +264,8 @@ rm(ft, coverage_stat)
 
 ## save data
 ```{r eval=FALSE, include=TRUE}
-save.image(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
-#load(file = "../data/BW_and_phylo.RData")
+#save.image(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
+load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
 ```
 
 ## rarefy alpha diversity
@@ -279,16 +279,74 @@ phylotree <- phylo_decontam_clean@phy_tree
 
 plan(multisession)
 system.time(aa <- future_map_dfr(ft_list, alpha_diversity_bootstrap, 
-                                phylotree = phylotree, depth = depth, n = 1000, 
+                                phylotree = phylotree, depth = depth, n = 100, 
                                 .id = "SampleID", .progress = F,
                                 .options = furrr_options(seed=NULL)))
+#user  system elapsed 
+#38.992   1.763 547.710
+
 
 alpha_boot <- aa %>% filter(!is.na(faith)) %>%
   dplyr::select(SampleID, Faith_PD=faith, Observed_ASVs=observed, 
                 Shannon_Index=shannon, Pielou_evenness=evenness)
+
+a1 <- pd(t(phylo_decontam_clean_rf@otu_table@.Data), phylo_decontam_clean_rf@phy_tree, include.root = F)
+a2 <- estimate_richness(phylo_decontam_clean_rf, measures="Shannon")
+alpha_rftb <- merge(a1, a2, by=0)
+names(alpha_rftb) <- c("SampleID","Faith_PD", "Observed_ASVs","Shannon_Index")
+alpha_rftb$Pielou_evenness <- alpha_rftb$Shannon_Index/log(alpha_rftb$Observed_ASVs)
+
+
+#save(alpha_boot, alpha_rftb,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
 ```
 
+### compare
+```{r}
+load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
+alpha_test <- inner_join(alpha_rftb, alpha_boot, by = "SampleID")
+alpha_test %>% pivot_longer(-SampleID, names_to = c("Metrics", "Method"), names_sep = "\\.") %>% 
+  mutate(Method = ifelse(Method == "x", "Rarefy_table", "Bootstrap")) %>% 
+  pivot_wider(c(SampleID, Metrics), names_from = Method, values_from = value) %>% 
+  ggplot(aes(x = Rarefy_table, y = Bootstrap)) + 
+    geom_point() + 
+    geom_smooth(method = "lm") + 
+    stat_regline_equation(label.y.npc = 0.8) + 
+    stat_cor(label.y.npc = 0.9) + 
+    facet_wrap(~ Metrics, nrow = 2, scales = "free")
+```
 
+## rarefy beta diversity
+```{r}
+
+psdata <- subset_samples(phylo_decontam_clean, !Sample_or_Blank)
+plan(multisession)
+system.time(unif_two <- cal_unifrac_dist_rarefy_bootstrap(psdata = psdata, depth = depth, n = 100, block_size = 100))
+#n = 10 data.table = 10
+#    user   system  elapsed 
+#  39.154    3.282 1003.004 
+
+#n = 100 data.table = 10
+#    user   system  elapsed 
+# 646.566   37.762 7630.126 
+
+DM_uu <- pivot_to_numeric_matrix(unif_two %>% filter(Metric == "uu"), Sample1, Sample2, value) %>% as.dist()
+DM_wu <- pivot_to_numeric_matrix(unif_two %>% filter(Metric == "wu"), Sample1, Sample2, value) %>% as.dist()
+
+ft = t(psdata@otu_table@.Data)
+system.time(DM_bray <- avgdist(ft,dmethod = "bray", sample = depth, iterations = 100))
+# user   system  elapsed 
+# 2782.295   27.415 2808.332
+system.time(DM_jaccard <- avgdist(ft,dmethod = "jaccard", sample = depth, iterations = 100))
+# user   system  elapsed 
+# 2782.295   27.415 2808.332 
+
+
+#save(DM_uu,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_uu.RData")
+#save(DM_wu,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_wu.RData")
+#save(DM_bray,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_bray.RData")
+#save(DM_jaccard,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_jaccard.RData")
+
+```
 
 
 
