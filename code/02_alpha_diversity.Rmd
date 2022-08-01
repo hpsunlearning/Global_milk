@@ -1,0 +1,163 @@
+---
+title: "Alpha diversity"
+author: "Haipeng Sun"
+date: "8/1/2022"
+output: html_document
+---
+
+## library
+```{r setup, message=FALSE, warning=FALSE}
+library(phyloseq)
+library(purrr)
+library(furrr)
+library(picante)
+library(vegan)
+library(MASS)
+library(ggpubr)
+library(tidyverse)
+```
+
+## load data
+```{r}
+load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
+load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
+temp_out = "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/alpha/"
+dat_alpha <- left_join(alpha_boot, meta_all, by = "SampleID")
+```
+
+## function
+```{r}
+comp_kw_aov = function(wdat, x, y){
+  #input data, respond variable y, categorize variable x
+  require(agricolae)
+  ktest1 = kruskal(wdat[y], wdat[x], alpha = 0.05, p.adj="none", group=T, main = "wdat", console=FALSE)
+  out_g_1 = ktest1$groups %>% rownames_to_column(var = "Var") %>% dplyr::select(Var, groups) %>% rename(KW_group = groups)
+  ktest2 = kruskal(wdat[y], wdat[x], alpha = 0.05, p.adj="none", group=F, main = "wdat", console=FALSE)
+  out_c_1 = ktest2$comparison %>% rownames_to_column(var = "comp") %>% dplyr::select(comp, pvalue) %>% rename(KW_pvalue = pvalue)
+  fit = aov(as.formula(paste0(y, "~", x)), wdat)
+  tukey1 = HSD.test(fit, x, group = T)
+  out_g_2 = tukey1$groups %>% rownames_to_column(var = "Var") %>% dplyr::select(Var, groups) %>% rename(aov_group = groups)
+  tukey2 = HSD.test(fit, x, group = F)
+  out_c_2 = tukey2$comparison %>% rownames_to_column(var = "comp") %>% dplyr::select(comp, pvalue) %>% rename(aov_pvalue = pvalue)
+  out_g = merge(out_g_1, out_g_2,by = 1)
+  out_c = merge(out_c_1, out_c_2,by = 1)
+  res = list(out_g, out_c)
+  names(res) = c("grp","comp")
+  res
+}
+```
+
+## alpha by heat
+```{r}
+dat <- dat_alpha %>% filter(heat_compare == "Y") %>% 
+  select(SampleID, Original_SampleID, heat_inactivated, Faith_PD:Pielou_evenness) %>% 
+  pivot_longer(Faith_PD:Pielou_evenness, names_to = "Metrics", values_to = "value")
+
+g <- ggplot(dat, aes(heat_inactivated, value)) + 
+  geom_boxplot(aes(color = heat_inactivated), outlier.alpha = 0) + 
+  geom_point(aes(color = heat_inactivated), position = position_jitterdodge()) + 
+  stat_compare_means() + 
+  scale_x_discrete(labels = c("N"="No heat", "Y"="Heat inactivated")) + 
+  labs(x="", y="") + 
+  facet_wrap(~Metrics, nrow = 2, scales = "free_y") +
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = paste0(temp_out, "alpha_by_heat.pdf"), device = cairo_pdf, 
+         plot = g, width = 9, height = 7, units = "in", dpi = 300) 
+
+wdat <- dat %>% select(Original_SampleID, heat_inactivated, Metrics, value) %>% 
+  pivot_wider(id_cols = c(Original_SampleID, Metrics), 
+              names_from = heat_inactivated, 
+              #names_glue = "{value}_{heat_inactivated}",
+              values_from = value)
+g <- ggplot(wdat, aes(N,Y)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  stat_regline_equation(label.x.npc = 0.6,label.y.npc = 0.2) + 
+  stat_cor(label.x.npc = 0.6, label.y.npc = 0.01) + 
+  scale_x_log10() + 
+  scale_y_log10() +  
+  labs(x="No heat", y="Heat inactivated", title = "") + 
+  facet_wrap(~Metrics, nrow = 2, scales = "free") +
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))  
+ggsave(filename = paste0(temp_out, "alpha_by_heat_individual.pdf"), device = cairo_pdf, 
+         plot = g, width = 9, height = 7, units = "in", dpi = 300) 
+```
+
+## alpha by country
+```{r}
+dat <- dat_alpha %>% filter(!is.na(Country), heat_compare == "N")
+metric <- names(alpha_boot)[2:5]
+names(metric) <- names(alpha_boot)[2:5]
+
+all_res <- map_dfr(metric, function(a){
+  res <- comp_kw_aov(wdat = dat, x = "Country", y = a)
+  res$grp$Metrics = a
+  res$comp$Metrics = a
+  res
+} )
+
+
+
+
+
+
+wdat <- dat %>% 
+  mutate(Country = factor(Country,
+                          levels = c("Guinea Ecuatorial", "Kenya", "Senegal", "South Sudan", "Tanzania",
+                                     "Ecuador", "ElSalvador", "Mexico", "Peru", "Puerto Rico", "United States",
+                                     "Austria", "Germany", "Netherlands", "Norway", "Spain"),
+                          ordered = T))  
+  
+  
+  
+  select(SampleID, Original_SampleID, heat_inactivated, Faith_PD:Pielou_evenness) %>% 
+  pivot_longer(Faith_PD:Pielou_evenness, names_to = "Metrics", values_to = "value")
+
+lst_df <- expand.grid(dat_alpha_pup$Sex %>% unique(), 
+                       dat_alpha_pup$TimePointInWeeks %>% unique(), 
+                       metric, stringsAsFactors = F)
+names(lst_df) <- c("Sex", "TimePointInWeeks", "Metrics")
+all_res <- map_dfr(1:nrow(lst_df), function(n){
+  wdat <- dat_alpha_pup %>% filter(Sex == lst_df[n,"Sex"], 
+                                  TimePointInWeeks == lst_df[n,"TimePointInWeeks"])
+  res <- comp_kw_aov(wdat = wdat, x = "BirthMode", y = lst_df[n,"Metrics"])
+  res$grp <- cbind(res$grp, lst_df[n,],row.names = NULL)
+  res$comp <- cbind(res$comp, lst_df[n,],row.names = NULL)
+  res
+})
+all_res$comp$KW_padj <- p.adjust(all_res$comp$KW_pvalue, method = "fdr")
+all_res$comp$aov_padj <- p.adjust(all_res$comp$aov_pvalue, method = "fdr")
+write.csv(all_res$grp, row.names = FALSE,
+          file = paste0(temp_out,"kw_aov_grp_birthmode_by_Sex_TimePointInWeeks.csv"))
+write.csv(all_res$comp, row.names = FALSE,
+          file = paste0(temp_out,"kw_aov_comp_birthmode_by_Sex_TimePointInWeeks.csv"))
+
+
+
+
+```
+
+
+
+
+
