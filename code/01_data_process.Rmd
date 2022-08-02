@@ -117,7 +117,6 @@ cal_unifrac_dist_rarefy_bootstrap <- function(psdata, depth, n, block_size = 100
 }
 ```
 
-
 ## 16S data process
 ### import into phyloseq
 ```{r}
@@ -164,18 +163,41 @@ taxa = taxa %>% mutate(ASV = str_c("asv_", 1:nrow(taxa)),
                        Family = str_replace_na(Family,""), Family = str_c("f_",Family),
                        Genus = str_replace_na(Genus,""), Genus = str_c("g_",Genus),
                        Species = str_replace_na(Species,""), Species = str_c("s_",Species),
-                       taxa_long = str_c(Kingdom,Phylum,Class,Order,Family,Genus,Species,ASV)
+                       taxa_long = str_c(Kingdom,Phylum,Class,Order,Family,Genus,Species,ASV,sep = ";")
                       )
 ```
 
 ### decontam
 ```{r }
 library(decontam)
-contamdf = isContaminant(phylo_all, method="prevalence",neg="Sample_or_Blank" )
-contam_id = contamdf %>% filter(contaminant) %>% rownames()
-phylo_decontam = prune_taxa(!(taxa_names(phylo_all) %in% contam_id), phylo_all)
+contamdf <- isContaminant(phylo_all, method="prevalence",neg="Sample_or_Blank" )
+a1 <- isContaminant(phylo_all, method="combined", conc="PCRConc", neg="Sample_or_Blank")
+a2 <- isContaminant(phylo_all, method="minimum", conc="PCRConc", neg="Sample_or_Blank")
+a3 <- isContaminant(phylo_all, method="either", conc="PCRConc", neg="Sample_or_Blank")
+a4 <- isContaminant(phylo_all, method="both", conc="PCRConc", neg="Sample_or_Blank")
+
+prev <- contamdf %>% filter(contaminant) %>% rownames()
+combined <- a1 %>% filter(contaminant) %>% rownames()
+minimum <- a2 %>% filter(contaminant) %>% rownames()
+either <- a3 %>% filter(contaminant) %>% rownames()
+both <- a4 %>% filter(contaminant) %>% rownames()
+
+lst <- list(prev, combined, minimum, either, both)
+names(lst) <- c("prev", "combined", "minimum", "either", "both")
+gplots::venn(lst)
+
+taxa %>% filter(id %in% unique(unlist(lst))) %>% 
+  mutate(prev = ifelse(id %in% prev, "Y", "N"),
+         combined = ifelse(id %in% combined, "Y", "N"),
+         minimum = ifelse(id %in% minimum, "Y", "N"),
+         either = ifelse(id %in% either, "Y", "N"),
+         both = ifelse(id %in% both, "Y", "N")) %>% 
+  select(taxa_long, prev, combined, minimum, either, both)
+# use prevalence method to decontam
+contam_id <- contamdf %>% filter(contaminant) %>% rownames()
+phylo_decontam <- prune_taxa(!(taxa_names(phylo_all) %in% contam_id), phylo_all)
 taxa %>% filter(id %in% contam_id)
-rm(contamdf, contam_id)
+rm(contamdf, contam_id, a1, a2, a3, a4, prev, combined, minimum, either, both, lst)
 ```
 
 ### filter unwanted taxa
@@ -349,7 +371,7 @@ system.time(DM_jaccard <- avgdist(ft,dmethod = "jaccard", sample = depth, iterat
 #save(DM_jaccard,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_jaccard.RData")
 ```
 
-## Sequence depth by country/project/heat_inactivation
+## depth by country
 ```{r}
 dat <- phylo_decontam_clean@sam_data@.Data %>% as.data.frame()
 names(dat) <- phylo_decontam_clean@sam_data@names
@@ -361,7 +383,7 @@ dat <- dat %>% filter(!is.na(Country)) %>%
                                      "Ecuador", "ElSalvador", "Mexico", "Peru", "Puerto Rico", "United States",
                                      "Austria", "Germany", "Netherlands", "Norway", "Spain"),
                           ordered = T))
-# depth by country
+
 g <- ggplot(dat %>% filter(heat_compare == "N"), 
             aes(Country, Seq_count_clean)) + 
   geom_boxplot(aes(color = Country, fill = Country), 
@@ -382,8 +404,21 @@ g <- ggplot(dat %>% filter(heat_compare == "N"),
                      title = element_text(size=12,color="black",face='bold'))
 ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/clean_reads_count_by_country.pdf", device = cairo_pdf, 
          plot = g, width = 7, height = 5, units = "in", dpi = 300)
+```
 
-# depth by DNA concentration
+## depth by DNA concentration
+```{r}
+dat <- phylo_decontam_clean@sam_data@.Data %>% as.data.frame()
+names(dat) <- phylo_decontam_clean@sam_data@names
+dat$SampleID <- phylo_decontam_clean@sam_data@row.names
+dat$Seq_count_clean <- sample_sums(phylo_decontam_clean)
+dat <- dat %>% filter(!is.na(Country)) %>% 
+  mutate(Country = factor(Country,
+                          levels = c("Guinea Ecuatorial", "Kenya", "Senegal", "South Sudan", "Tanzania",
+                                     "Ecuador", "ElSalvador", "Mexico", "Peru", "Puerto Rico", "United States",
+                                     "Austria", "Germany", "Netherlands", "Norway", "Spain"),
+                          ordered = T))
+
 g <- ggplot(dat %>% filter(heat_compare == "N"), 
             aes(DNA_Conc_ng_uL, Seq_count_clean)) + 
   geom_point(aes(color = Country)) + 
@@ -407,12 +442,59 @@ g <- ggplot(dat %>% filter(heat_compare == "N"),
                      title = element_text(size=12,color="black",face='bold'))
 ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/clean_reads_count_by_DNA_conc.pdf", device = cairo_pdf, 
          plot = g, width = 7, height = 5, units = "in", dpi = 300)
+```
 
-# depth by heat_inactivation 
-g <- ggplot(dat %>% filter(heat_compare == "Y"),
+## depth by PCR concentration
+```{r}
+dat <- phylo_decontam_clean@sam_data@.Data %>% as.data.frame()
+names(dat) <- phylo_decontam_clean@sam_data@names
+dat$SampleID <- phylo_decontam_clean@sam_data@row.names
+dat$Seq_count_clean <- sample_sums(phylo_decontam_clean)
+dat <- dat %>% filter(!is.na(Country)) %>% 
+  mutate(Country = factor(Country,
+                          levels = c("Guinea Ecuatorial", "Kenya", "Senegal", "South Sudan", "Tanzania",
+                                     "Ecuador", "ElSalvador", "Mexico", "Peru", "Puerto Rico", "United States",
+                                     "Austria", "Germany", "Netherlands", "Norway", "Spain"),
+                          ordered = T))
+
+g <- ggplot(dat %>% filter(heat_compare == "N"), 
+            aes(PCRConc, Seq_count_clean)) + 
+  geom_point(aes(color = Country)) + 
+  scale_x_log10() + 
+  scale_y_log10() +
+  scale_color_manual(values = Country_color, aesthetics = c("color","fill")) + 
+  geom_smooth(method = "lm") + 
+  stat_regline_equation(label.x.npc = 0.6,label.y.npc = 0.3) + 
+  stat_cor(label.x.npc = 0.6, label.y.npc = 0.2) + 
+  labs(x = expression("PCR concentration (ng/"*mu*"L)"), y = "Clean sequence count") + 
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     #legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold'),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/clean_reads_count_by_PCR_conc.pdf", device = cairo_pdf, 
+         plot = g, width = 7, height = 5, units = "in", dpi = 300)
+```
+
+## depth by heat_inactivation 
+```{r}
+dat <- phylo_decontam_clean@sam_data@.Data %>% as.data.frame()
+names(dat) <- phylo_decontam_clean@sam_data@names
+dat$SampleID <- phylo_decontam_clean@sam_data@row.names
+dat$Seq_count_clean <- sample_sums(phylo_decontam_clean)
+dat <- dat %>% filter(!is.na(Country), heat_compare == "Y")
+
+g <- ggplot(dat,
             aes(heat_inactivated, Seq_count_clean)) + 
   geom_boxplot(aes(color = heat_inactivated)) + 
-  geom_point(aes(color = heat_inactivated), position = position_jitterdodge()) + 
+  geom_point(aes(color = heat_inactivated)) + 
+  geom_path(aes(group = Original_SampleID), alpha = 0.6, color = "gray") +
   stat_compare_means() + 
   scale_x_discrete(labels = c("N"="No heat", "Y"="Heat inactivated")) + 
   labs(x="", y="Clean sequence count") + 
@@ -430,30 +512,8 @@ g <- ggplot(dat %>% filter(heat_compare == "Y"),
 ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/clean_reads_count_by_heat.pdf", device = cairo_pdf, 
          plot = g, width = 7, height = 5, units = "in", dpi = 300)
 
-# DNAconc by heat_inactivation 
-g <- ggplot(dat %>% filter(heat_compare == "Y"),
-            aes(heat_inactivated, DNA_Conc_ng_uL)) + 
-  geom_boxplot(aes(color = heat_inactivated)) + 
-  geom_point(aes(color = heat_inactivated), position = position_jitterdodge()) + 
-  stat_compare_means() + 
-  scale_x_discrete(labels = c("N"="No heat", "Y"="Heat inactivated")) + 
-  labs(x="", y=expression("DNA concentration (ng/"*mu*"L)")) + 
-  theme_bw() + theme(#aspect.ratio = 0.8,
-                     legend.position="none",
-                     panel.background = element_rect(fill = NA),
-                     strip.text = element_text(size=12,color="black",face='bold'),
-                     axis.title = element_text(size=12,color="black",face='bold'),
-                     axis.text = element_text(size=12,color="black",face='bold'),
-                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
-                     axis.text.y = element_text(size=12,color="black",face='bold'),
-                     legend.text = element_text(size=12,color="black",face='bold'),
-                     legend.title = element_text(size=12,color="black",face='bold'),
-                     title = element_text(size=12,color="black",face='bold'))
-ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/DNAconc_by_heat.pdf", device = cairo_pdf, 
-         plot = g, width = 7, height = 5, units = "in", dpi = 300)
-
 # heat_inactivation individual
-wdat <- dat %>% filter(heat_compare == "Y") %>% 
+wdat <- dat %>% 
               select(Original_SampleID, heat_inactivated, DNA_Conc_ng_uL, Seq_count_clean) %>% 
               pivot_wider(id_cols = Original_SampleID, 
                           names_from = heat_inactivated, names_glue = "{.value}_{heat_inactivated}",
@@ -482,6 +542,74 @@ g <- ggplot(wdat,
 ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/clean_reads_count_by_heat_individual.pdf",
        device = cairo_pdf, plot = g, width = 7, height = 5, units = "in", dpi = 300)
 
+```
+
+## depth by extraction method
+```{r}
+dat <- phylo_decontam_clean@sam_data@.Data %>% as.data.frame()
+names(dat) <- phylo_decontam_clean@sam_data@names
+dat$SampleID <- phylo_decontam_clean@sam_data@row.names
+dat$Seq_count_clean <- sample_sums(phylo_decontam_clean)
+dat <- dat %>% filter(!is.na(Country))
+
+g <- ggplot(dat,
+            aes(Extraction_method, Seq_count_clean)) + 
+  geom_boxplot(aes(color = Extraction_method)) + 
+  geom_point(aes(color = Extraction_method), position = position_dodge2()) + 
+  stat_compare_means() + 
+  labs(x="", y="Clean sequence count") + 
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/clean_reads_count_by_method.pdf", device = cairo_pdf, 
+         plot = g, width = 7, height = 5, units = "in", dpi = 300)
+```
+
+## DNA Conc by heat_inactivation
+```{r}
+dat <- phylo_decontam_clean@sam_data@.Data %>% as.data.frame()
+names(dat) <- phylo_decontam_clean@sam_data@names
+dat$SampleID <- phylo_decontam_clean@sam_data@row.names
+dat$Seq_count_clean <- sample_sums(phylo_decontam_clean)
+dat <- dat %>% filter(!is.na(Country), heat_compare == "Y")
+
+g <- ggplot(dat,
+            aes(heat_inactivated, DNA_Conc_ng_uL)) + 
+  geom_boxplot(aes(color = heat_inactivated)) + 
+  geom_point(aes(color = heat_inactivated)) + 
+  geom_path(aes(group = Original_SampleID), alpha = 0.6, color = "gray") +
+  stat_compare_means() + 
+  scale_x_discrete(labels = c("N"="No heat", "Y"="Heat inactivated")) + 
+  labs(x="", y=expression("DNA concentration (ng/"*mu*"L)")) + 
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/DNAconc_by_heat.pdf", device = cairo_pdf, 
+         plot = g, width = 7, height = 5, units = "in", dpi = 300)
+
+# heat_inactivation individual
+wdat <- dat %>% 
+              select(Original_SampleID, heat_inactivated, DNA_Conc_ng_uL, Seq_count_clean) %>% 
+              pivot_wider(id_cols = Original_SampleID, 
+                          names_from = heat_inactivated, names_glue = "{.value}_{heat_inactivated}",
+                          values_from = c(DNA_Conc_ng_uL, Seq_count_clean)) 
+
 g <- ggplot(wdat,
             aes(DNA_Conc_ng_uL_N, DNA_Conc_ng_uL_Y)) + 
   geom_point() + 
@@ -506,18 +634,172 @@ ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/DNAconc_by_
          plot = g, width = 7, height = 5, units = "in", dpi = 300)
 ```
 
+## DNA Conc by extraction method
+```{r}
+dat <- phylo_decontam_clean@sam_data@.Data %>% as.data.frame()
+names(dat) <- phylo_decontam_clean@sam_data@names
+dat$SampleID <- phylo_decontam_clean@sam_data@row.names
+dat$Seq_count_clean <- sample_sums(phylo_decontam_clean)
+dat <- dat %>% filter(!is.na(Country))
+
+g <- ggplot(dat,
+            aes(Extraction_method, DNA_Conc_ng_uL)) + 
+  geom_boxplot(aes(color = Extraction_method)) + 
+  geom_point(aes(color = Extraction_method), position = position_dodge2(width = 0.2)) + 
+  stat_compare_means() + 
+  scale_y_log10() + 
+  labs(x="", y=expression("DNA concentration (ng/"*mu*"L)")) + 
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/DNAconc_by_method.pdf", device = cairo_pdf, 
+         plot = g, width = 7, height = 5, units = "in", dpi = 300)
+```
 
 
+## PCR Conc by heat_inactivation 
+```{r}
+dat <- phylo_decontam_clean@sam_data@.Data %>% as.data.frame()
+names(dat) <- phylo_decontam_clean@sam_data@names
+dat$SampleID <- phylo_decontam_clean@sam_data@row.names
+dat$Seq_count_clean <- sample_sums(phylo_decontam_clean)
+dat <- dat %>% filter(!is.na(Country), heat_compare == "Y")
+
+g <- ggplot(dat,
+            aes(heat_inactivated, PCRConc)) + 
+  geom_boxplot(aes(color = heat_inactivated)) + 
+  geom_point(aes(color = heat_inactivated)) + 
+  geom_path(aes(group = Original_SampleID), alpha = 0.6, color = "gray") +
+  stat_compare_means() + 
+  scale_x_discrete(labels = c("N"="No heat", "Y"="Heat inactivated")) + 
+  labs(x="", y=expression("PCR concentration (ng/"*mu*"L)")) + 
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/PCRconc_by_heat.pdf", device = cairo_pdf, 
+         plot = g, width = 7, height = 5, units = "in", dpi = 300)
+
+# heat_inactivation individual
+wdat <- dat %>% 
+              select(Original_SampleID, heat_inactivated, PCRConc, Seq_count_clean) %>% 
+              pivot_wider(id_cols = Original_SampleID, 
+                          names_from = heat_inactivated, names_glue = "{.value}_{heat_inactivated}",
+                          values_from = c(PCRConc, Seq_count_clean)) 
+
+g <- ggplot(wdat,
+            aes(PCRConc_N, PCRConc_Y)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  stat_regline_equation(label.x.npc = 0.6,label.y.npc = 0.2) + 
+  stat_cor(label.x.npc = 0.6, label.y.npc = 0.1) + 
+  scale_x_log10() + 
+  scale_y_log10() +  
+  labs(x="No heat", y="Heat inactivated", title = expression("PCR concentration (ng/"*mu*"L)")) + 
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/PCRConc_by_heat_individual.pdf", device = cairo_pdf, 
+         plot = g, width = 7, height = 5, units = "in", dpi = 300)
+```
+
+## PCR Conc by extraction method
+```{r}
+dat <- phylo_decontam_clean@sam_data@.Data %>% as.data.frame()
+names(dat) <- phylo_decontam_clean@sam_data@names
+dat$SampleID <- phylo_decontam_clean@sam_data@row.names
+dat$Seq_count_clean <- sample_sums(phylo_decontam_clean)
+dat <- dat %>% filter(!is.na(Country))
+
+g <- ggplot(dat,
+            aes(Extraction_method, PCRConc)) + 
+  geom_boxplot(aes(color = Extraction_method)) + 
+  geom_point(aes(color = Extraction_method), position = position_dodge2(width = 0.2)) + 
+  stat_compare_means() + 
+  scale_y_log10() + 
+  labs(x="", y=expression("PCR concentration (ng/"*mu*"L)")) + 
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/PCRconc_by_method.pdf", device = cairo_pdf, 
+         plot = g, width = 7, height = 5, units = "in", dpi = 300)
+```
+
+## corelation between variables
+```{r}
+dat <- phylo_decontam_clean@sam_data@.Data %>% as.data.frame()
+names(dat) <- phylo_decontam_clean@sam_data@names
+dat$SampleID <- phylo_decontam_clean@sam_data@row.names
+dat$Seq_count_clean <- sample_sums(phylo_decontam_clean)
+dat <- dat %>% filter(!is.na(Country))
+
+cor(dat %>% select( DNA_Conc_ng_uL, PCRConc, Seq_count, Seq_count_clean), use = "complete.obs")
+
+dat <- dat %>% 
+  mutate(Project2 = case_when(Country == "United States" & str_detect(SampleID, "^C") ~ "Covid Mom",
+                             Country == "United States" & str_detect(SampleID, "^UP") ~ "Upside",
+                             Country == "United States" & str_detect(SampleID, "^F") ~ "Family",
+                             Country == "United States" & str_detect(SampleID, "^\\d+") ~ "Milkbank",
+                             Country == "Spain" & heat_inactivated == "Y" ~ "Covid Spain",
+                             Country == "Puerto Rico" ~ "PR",
+                             TRUE ~ "Global")) %>% 
+  arrange(Country, Project, SampleID)
+
+a <- dat %>% select(SampleID, Extraction_method, heat_inactivated, Country, Project2) %>% 
+  group_by(Extraction_method, heat_inactivated, Country, Project2) %>% 
+  summarise(N = n()) %>% ungroup() %>% 
+  pivot_wider(id_cols = c(Project2, Extraction_method, heat_inactivated), 
+              names_from = "Country",
+              values_from = "N") 
+write.csv(a, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/by_project_N.csv",
+          row.names = FALSE)
 
 
+a <- dat %>% select(SampleID, Extraction_method, heat_inactivated, Country) %>% 
+  group_by(Extraction_method, heat_inactivated, Country) %>% 
+  summarise(N = n()) %>% ungroup() %>% 
+  pivot_wider(id_cols = c(Extraction_method, heat_inactivated), 
+              names_from = "Country",
+              values_from = "N")
+write.csv(a, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/by_country_N.csv",
+          row.names = FALSE)
+```
 
+## subset to each method for depth and conc compare
+```{r}
 
-
-
-
-
-
-
+```
 
 
 
