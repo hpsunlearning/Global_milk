@@ -1,7 +1,7 @@
 ---
 title: "Taxa"
 author: "Haipeng Sun"
-date: "7/21/2022"
+date: "8/5/2022"
 output: html_document
 ---
 
@@ -24,14 +24,74 @@ library(purrr)
 library(furrr)
 library(rlist)
 library(ggpubr)
+library(ggtext)
+library(glue)
+library(gplots)
+library(UpSetR)
 library(tidyverse)
 ```
 
 ## load data
 ```{r}
-load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData")
-temp_out = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/taxa/"
+load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
+temp_out = "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/taxa/"
 ```
+
+## Global samples
+```{r}
+#meta_global <- phylo_decontam_clean_rf@sam_data@.Data %>% as.data.frame()
+#names(meta_global) <- phylo_decontam_clean_rf@sam_data@names
+#meta_global$SampleID <- phylo_decontam_clean_rf@sam_data@row.names
+#meta_global <- rbind(meta_global %>% filter(!is.na(Country), Project %in% c("Global", "Upside", "Milkbank")),
+#                     meta_global %>% filter(!is.na(Country), Project  %in% c("Covid Mom", "Family", "PR")) %>%
+#               filter(TimePoint == 1200))
+
+#phylo_global <- prune_samples(meta_global$SampleID, phylo_decontam_clean_rf)
+#phylo_global_s <- tax_glom(phylo_global, taxrank = "Species")
+#phylo_global_g <- tax_glom(phylo_global, taxrank = "Genus")
+#phylo_global_f <- tax_glom(phylo_global, taxrank = "Family")
+
+#save(meta_global, phylo_global, phylo_global_s, phylo_global_g, phylo_global_f,
+#     file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_global.Rdata")
+load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_global.Rdata")
+```
+
+## unique ASV/species/genus in different Country (Global Project)
+```{r}
+for (taxrank in c("ASV","Species","Genus", "Family")){
+  if (taxrank == "ASV"){
+    ft <- otu_table(phylo_global@otu_table) %>% as.data.frame() %>% t()
+  }else if(taxrank == "Species"){
+    ft <- otu_table(phylo_global_s@otu_table) %>% as.data.frame() %>% t()
+  }else if(taxrank == "Genus"){
+    ft <- otu_table(phylo_global_g@otu_table) %>% as.data.frame() %>% t()
+  }else{
+    ft <- otu_table(phylo_global_f@otu_table) %>% as.data.frame() %>% t()
+  }
+  ft <- ft[meta_global$SampleID,]
+  asv_sum_country <- aggregate(ft, by = list(meta_global$Country), sum)
+  asv_sum_country_lst <- split(asv_sum_country[,-1], asv_sum_country[,1])
+  asv_lst <- lapply(asv_sum_country_lst, function(dat){
+    names(dat)[(which(dat[1,] > 1))]
+  })
+  g <- upset(fromList(asv_lst), 
+           sets = c("Guinea Ecuatorial", "Kenya", "Senegal", "South Sudan", "Tanzania",
+                    "Ecuador", "ElSalvador", "Mexico", "Peru", "Puerto Rico", "United States",
+                    "Austria", "Germany", "Netherlands", "Norway", "Spain"),
+           order.by = "freq", keep.order = TRUE,
+      nsets = length(asv_lst),
+      nintersects = 40)  
+  pdf(file = paste0(temp_out,"rarefied_sharing_", taxrank, ".pdf"), 
+      width = 9, height = 7, useDingbats = F)
+  print(g)
+  dev.off() 
+}
+
+```
+
+
+
+
 
 ## masslin2
 ### function

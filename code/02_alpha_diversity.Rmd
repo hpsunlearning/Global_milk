@@ -15,6 +15,8 @@ library(vegan)
 library(MASS)
 library(ggpubr)
 library(effectsize)
+library(ggtext)
+library(glue)
 library(tidyverse)
 ```
 
@@ -70,7 +72,7 @@ names(metric) <- names(alpha_boot)[2:5]
 
 dat <- dat_alpha %>% filter(!is.na(DNA_Conc_ng_uL)) 
 alpha_lm_coef <- map_dfr(metric, function(a){
-  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + Country + Extraction_method")), data = dat)
+  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + Country + Extraction_method + heat_inactivated")), data = dat)
   anova_fit <- anova(fit)
   sum_fit <- summary(fit)
   effect_fit <- effectsize(anova_fit, "omega")
@@ -85,7 +87,7 @@ write.csv(alpha_lm_coef, row.names = FALSE,
           file = paste0(temp_out,"alpha_lm_country_conc_method_all_coef.csv"))
 
 alpha_lm_omega <- map_dfr(metric, function(a){
-  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + Country + Extraction_method")), data = dat)
+  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + Country + Extraction_method + heat_inactivated")), data = dat)
   anova_fit <- anova(fit)
   sum_fit <- summary(fit)
   effect_fit <- effectsize(anova_fit, "omega")
@@ -99,7 +101,7 @@ alpha_lm_omega <- map_dfr(metric, function(a){
 write.csv(alpha_lm_omega, row.names = FALSE,
           file = paste0(temp_out,"alpha_lm_country_conc_method_all_omega.csv"))
 
-dat <- dat_alpha %>% filter(!is.na(DNA_Conc_ng_uL),heat_compare == "Y" ) 
+dat <- dat_alpha %>% filter(!is.na(DNA_Conc_ng_uL), heat_compare == "Y" ) 
 alpha_lm_heat_coef <- map_dfr(metric, function(a){
   fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + heat_inactivated")), data = dat)
   anova_fit <- anova(fit)
@@ -139,27 +141,6 @@ dat <- dat_alpha %>% filter(heat_compare == "Y") %>%
 
 g <- ggplot(dat, aes(heat_inactivated, value)) + 
   geom_boxplot(aes(color = heat_inactivated), outlier.alpha = 0) + 
-  geom_point(aes(color = heat_inactivated), position = position_jitterdodge()) + 
-  stat_compare_means() + 
-  scale_x_discrete(labels = c("N"="No heat", "Y"="Heat inactivated")) + 
-  labs(x="", y="") + 
-  facet_wrap(~Metrics, nrow = 2, scales = "free_y") +
-  theme_bw() + theme(#aspect.ratio = 0.8,
-                     legend.position="none",
-                     panel.background = element_rect(fill = NA),
-                     strip.text = element_text(size=12,color="black",face='bold'),
-                     axis.title = element_text(size=12,color="black",face='bold'),
-                     axis.text = element_text(size=12,color="black",face='bold'),
-                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
-                     axis.text.y = element_text(size=12,color="black",face='bold'),
-                     legend.text = element_text(size=12,color="black",face='bold'),
-                     legend.title = element_text(size=12,color="black",face='bold'),
-                     title = element_text(size=12,color="black",face='bold'))
-ggsave(filename = paste0(temp_out, "alpha_by_heat.pdf"), device = cairo_pdf, 
-         plot = g, width = 9, height = 7, units = "in", dpi = 300) 
-
-g <- ggplot(dat, aes(heat_inactivated, value)) + 
-  geom_boxplot(aes(color = heat_inactivated), outlier.alpha = 0) + 
   geom_point(aes(color = heat_inactivated)) + 
   geom_path(aes(group = Original_SampleID), alpha = 0.5, color = "gray") + 
   stat_compare_means() + 
@@ -177,7 +158,7 @@ g <- ggplot(dat, aes(heat_inactivated, value)) +
                      legend.text = element_text(size=12,color="black",face='bold'),
                      legend.title = element_text(size=12,color="black",face='bold'),
                      title = element_text(size=12,color="black",face='bold'))
-ggsave(filename = paste0(temp_out, "alpha_by_heat_linked.pdf"), device = cairo_pdf, 
+ggsave(filename = paste0(temp_out, "alpha_by_heat.pdf"), device = cairo_pdf, 
          plot = g, width = 9, height = 7, units = "in", dpi = 300) 
 
 wdat <- dat %>% select(Original_SampleID, heat_inactivated, Metrics, value) %>% 
@@ -210,18 +191,18 @@ ggsave(filename = paste0(temp_out, "alpha_by_heat_individual.pdf"), device = cai
 
 ## alpha vs DNAconc PCRconc
 ```{r}
-dat <- dat_alpha %>% filter(!is.na(DNA_Conc_ng_uL)) %>% 
-  dplyr::select(SampleID, DNA_Conc_ng_uL, Faith_PD:Pielou_evenness) %>% 
+dat <- dat_alpha %>% filter(!is.na(Country), heat_inactivated == "N") %>% 
+  dplyr::select(SampleID,Extraction_method, DNA_Conc_ng_uL, PCRConc, Faith_PD:Pielou_evenness) %>% 
   pivot_longer(Faith_PD:Pielou_evenness, names_to = "Metrics", values_to = "value")
 
-g <- ggplot(dat, aes(DNA_Conc_ng_uL,value)) + 
+g <- ggplot(dat, aes(DNA_Conc_ng_uL, value)) + 
   geom_point() + 
   geom_smooth(method = "lm") + 
-  stat_regline_equation(label.x.npc = 0,label.y.npc = 0.2) + 
-  stat_cor(label.x.npc = 0, label.y.npc = 0.01) + 
+  stat_regline_equation(label.x.npc = 0,label.y.npc = 0.25) + 
+  stat_cor(label.x.npc = 0, label.y.npc = 0.1) + 
   scale_x_log10() + 
   scale_y_log10() +  
-  labs(x=expression("DNA concentration (ng/"*mu*"L)"), y="", title = "") + 
+  labs(x=expression(bold("DNA concentration (ng/"*mu*"L)")), y="", title = "") + 
   facet_wrap(~Metrics, nrow = 2, scales = "free") +
   theme_bw() + theme(#aspect.ratio = 0.8,
                      legend.position="none",
@@ -235,20 +216,39 @@ g <- ggplot(dat, aes(DNA_Conc_ng_uL,value)) +
                      legend.title = element_text(size=12,color="black",face='bold'),
                      title = element_text(size=12,color="black",face='bold'))  
 ggsave(filename = paste0(temp_out, "alpha_by_DNAconc.pdf"), device = cairo_pdf, 
-         plot = g, width = 9, height = 7, units = "in", dpi = 300) 
+         plot = g, width = 14, height = 10, units = "in", dpi = 300) 
 
-dat <- dat_alpha %>% filter(!is.na(PCRConc)) %>% 
-  dplyr::select(SampleID, PCRConc, Faith_PD:Pielou_evenness) %>% 
-  pivot_longer(Faith_PD:Pielou_evenness, names_to = "Metrics", values_to = "value")
-
-g <- ggplot(dat, aes(PCRConc,value)) + 
-  geom_point() + 
+g <- ggplot(dat, aes(DNA_Conc_ng_uL, value, color = Extraction_method)) + 
+  geom_point(alpha = 0.7) + 
   geom_smooth(method = "lm") + 
-  stat_regline_equation(label.x.npc = 0,label.y.npc = 0.2) + 
-  stat_cor(label.x.npc = 0, label.y.npc = 0.01) + 
+  stat_regline_equation(label.x.npc = 0,label.y.npc = 0.25) + 
+  stat_cor(label.x.npc = 0, label.y.npc = 0.1) + 
   scale_x_log10() + 
   scale_y_log10() +  
-  labs(x=expression("PCR concentration (ng/"*mu*"L)"), y="", title = "") + 
+  labs(x=expression(bold("DNA concentration (ng/"*mu*"L)")), y="", title = "") + 
+  facet_wrap(~Metrics, nrow = 2, scales = "free") +
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))  
+ggsave(filename = paste0(temp_out, "alpha_by_DNAconc_extract_method.pdf"), device = cairo_pdf, 
+         plot = g, width = 14, height = 10, units = "in", dpi = 300) 
+
+g <- ggplot(dat, aes(PCRConc, value)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  stat_regline_equation(label.x.npc = 0,label.y.npc = 0.25) + 
+  stat_cor(label.x.npc = 0, label.y.npc = 0.1) + 
+  scale_x_log10() + 
+  scale_y_log10() +  
+  labs(x=expression(bold("PCR concentration (ng/"*mu*"L)")), y="", title = "") + 
   facet_wrap(~Metrics, nrow = 2, scales = "free") +
   theme_bw() + theme(#aspect.ratio = 0.8,
                      legend.position="none",
@@ -262,20 +262,46 @@ g <- ggplot(dat, aes(PCRConc,value)) +
                      legend.title = element_text(size=12,color="black",face='bold'),
                      title = element_text(size=12,color="black",face='bold'))  
 ggsave(filename = paste0(temp_out, "alpha_by_PCRconc.pdf"), device = cairo_pdf, 
-         plot = g, width = 9, height = 7, units = "in", dpi = 300)
+         plot = g, width = 14, height = 10, units = "in", dpi = 300)
+
+g <- ggplot(dat, aes(PCRConc, value, color = Extraction_method)) + 
+  geom_point(alpha = 0.7) + 
+  geom_smooth(method = "lm") + 
+  stat_regline_equation(label.x.npc = 0,label.y.npc = 0.25) + 
+  stat_cor(label.x.npc = 0, label.y.npc = 0.1) + 
+  scale_x_log10() + 
+  scale_y_log10() +  
+  labs(x=expression(bold("PCR concentration (ng/"*mu*"L)")), y="", title = "") + 
+  facet_wrap(~Metrics, nrow = 2, scales = "free") +
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))  
+ggsave(filename = paste0(temp_out, "alpha_by_PCRconc_extract_method.pdf"), device = cairo_pdf, 
+         plot = g, width = 14, height = 10, units = "in", dpi = 300)
 
 ```
 
-## alpha by country
+## alpha in Global project
 ```{r}
-dat <- dat_alpha %>% filter(!is.na(Country), heat_compare == "N")
+dat <- rbind(dat_alpha %>% filter(!is.na(Country), Project %in% c("Global", "Upside", "Milkbank")),
+             dat_alpha %>% filter(!is.na(Country), Project  %in% c("Covid Mom", "Family", "PR")) %>%
+               filter(TimePoint == 1200))
+
 metric <- names(alpha_boot)[2:5]
 names(metric) <- names(alpha_boot)[2:5]
 
 alpha_country_grp <- map_dfr(metric, function(a){
   res <- comp_kw_aov(wdat = dat, x = "Country", y = a)
   res$grp$Metrics = a
-  as.data.frame(res$grp)
+  res$grp
 })
 write.csv(alpha_country_grp, row.names = FALSE,
           file = paste0(temp_out,"kw_aov_grp_alpha_by_country.csv"))
@@ -307,12 +333,15 @@ wdat <- dat %>%
   dplyr::select(SampleID, Country, Faith_PD:Pielou_evenness) %>% 
   pivot_longer(Faith_PD:Pielou_evenness, names_to = "Metrics", values_to = "value")
 
+
+
 g <- ggplot(wdat, aes(Country, value)) + 
-  geom_boxplot(aes(color = Country, fill = Country),alpha = 0.6,  outlier.alpha = 0) + 
+  geom_boxplot(aes(color = Country, fill = Country),alpha = 0.7,  outlier.alpha = 0) + 
   geom_point(aes(color = Country), position = position_jitterdodge()) + 
   geom_text(data = alpha_country_summary, 
             aes(x =  Country, y = 1.05 * Max, label = KW_group)) + 
   scale_color_manual(values = Country_color, aesthetics = c("color","fill")) + 
+  scale_x_discrete(labels=country_labels) + 
   labs(x = "", y = "") +
   facet_wrap(~Metrics, nrow = 2, scales = "free") +
   theme_bw() + theme(#aspect.ratio = 0.8,
@@ -321,7 +350,7 @@ g <- ggplot(wdat, aes(Country, value)) +
                      strip.text = element_text(size=12,color="black",face='bold'),
                      axis.title = element_text(size=12,color="black",face='bold'),
                      axis.text = element_text(size=12,color="black",face='bold'),
-                     axis.text.x = element_text(size=12,color="black",face='bold',angle=90,vjust = 0.5, hjust = 1),
+                     axis.text.x = element_markdown(size=12, face='bold',angle=90,vjust = 0.5, hjust = 1),
                      axis.text.y = element_text(size=12,color="black",face='bold'),
                      legend.text = element_text(size=12,color="black",face='bold'),
                      legend.title = element_text(size=12,color="black",face='bold'),
@@ -336,11 +365,12 @@ for (a in metric){
   ord = wsummary %>% pull(Country)
   wwdat$Country <- factor(wwdat$Country, levels = ord, ordered = T)
   g <- ggplot(wwdat, aes(Country, value)) + 
-    geom_boxplot(aes(color = Country, fill = Country),alpha = 0.6,  outlier.alpha = 0) + 
+    geom_boxplot(aes(color = Country, fill = Country),alpha = 0.7,  outlier.alpha = 0) + 
     geom_point(aes(color = Country), position = position_jitterdodge()) + 
     geom_text(data = wsummary, 
               aes(x =  Country, y = 1.05 * Max, label = KW_group)) + 
     scale_color_manual(values = Country_color, aesthetics = c("color","fill")) + 
+    scale_x_discrete(labels=country_labels) + 
     labs(x = "", y = "") + 
     theme_bw() + theme(#aspect.ratio = 0.8,
                      legend.position="none",
@@ -348,7 +378,7 @@ for (a in metric){
                      strip.text = element_text(size=12,color="black",face='bold'),
                      axis.title = element_text(size=12,color="black",face='bold'),
                      axis.text = element_text(size=12,color="black",face='bold'),
-                     axis.text.x = element_text(size=12,color="black",face='bold',angle=90,vjust = 0.5, hjust = 1),
+                     axis.text.x = element_markdown(size=12,face='bold',angle=90,vjust = 0.5, hjust = 1),
                      axis.text.y = element_text(size=12,color="black",face='bold'),
                      legend.text = element_text(size=12,color="black",face='bold'),
                      legend.title = element_text(size=12,color="black",face='bold'),

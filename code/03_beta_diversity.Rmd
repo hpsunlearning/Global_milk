@@ -16,6 +16,8 @@ library(vegan)
 library(ape)
 library(rlist)
 library(ggpubr)
+library(ggtext)
+library(glue)
 library(tidyverse)
 ```
 
@@ -55,288 +57,54 @@ for(dd in c("uu","wu","bray","jaccard")){
   disper <- betadisper(wdist, wmeta$Country)
   d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
     rownames_to_column(var = "Variable")
-  disper <- betadisper(wdist, wmeta$)
+  disper <- betadisper(wdist, wmeta$Extraction_method)
   d2 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
     rownames_to_column(var = "Variable")
-  disper <- betadisper(wdist, wmeta$Age_group)
+  disper <- betadisper(wdist, wmeta$heat_inactivated)
   d3 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
     rownames_to_column(var = "Variable")
-  write.csv(rbind(d1, d2, d3), 
+  disper <- betadisper(wdist, wmeta$Project)
+  d4 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+    rownames_to_column(var = "Variable")  
+  write.csv(rbind(d1, d2, d3, d4), 
             file = paste0(temp_out,dd,"_","dispersion_test.csv"), quote = F, row.names = F)
-  ##pairwise adonis 
-  comp <- combn(wmeta$Age_group %>% unique() %>% as.character(),2)
-  res <- lapply(1:ncol(comp), function(i){
-    wwmeta <- wmeta %>% filter(Age_group %in% comp[,i])
-    wwdist <- dist_subset(wdist, wwmeta$SampleID)
-    calcOmega2_dm(adonis2(wwdist ~ Age_group, data = wwmeta, by = "terms")) %>% 
-      as.data.frame() %>% mutate(comp = str_c(comp[1,i], comp[2,i], sep = " - ")) %>% 
-      filter(!is.na(F))
-  })
-  res_Age_group <- do.call(rbind, res) %>% mutate(padj = p.adjust(`Pr(>F)`)) %>% dplyr::select(comp, everything())
-  
-  
-  
-
-}
-```
-
-## beta by country
-```{r}
-
-```
-
-## over all explore
-```{r}
-for(dd in c("uu","wu","bray","jaccard")){
-  wdist <- get(paste0("DM_",dd))
-  wmeta = meta_all %>% filter(SampleID %in% labels(wdist))
-  ## ape::pcoa
-  wpcoa <- pcoa(wdist)
-  varPC1 <- round(wpcoa$values$Relative_eig[1]*100, 2)
-  varPC2 <- round(wpcoa$values$Relative_eig[2]*100, 2)
-  wdat <- merge(wpcoa$vectors[,1:2], wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
-    rename(PC1 = `Axis.1`, PC2 = `Axis.2`) %>% 
-    mutate(grp1 = ifelse(is.na(BirthMode),"Mom-vagina", str_c(BirthMode, "pup", BodySite, sep = "-")),
-           grp2 = ifelse(is.na(BirthMode),"Mom-vagina-day0", str_c("pup", Age_group, sep = "-")))
-  x_lab <- paste0("PC1 (", varPC1, "%)")
-  y_lab <- paste0("PC2 (", varPC2, "%)")
-  plot_g1 <- function(wdat, x_lab, y_lab){
-    ggplot(wdat, aes(x = PC1, y = PC2, color = grp1)) + 
-    geom_point() + 
-    scale_color_manual(values = c("CS-pup-Feces"="#E41A1C", "CSR-pup-Feces"="#4DAF4A",
-                                  "VF-pup-Feces"="#377EB8", "Mom-vagina"="Gray50"),name = "") + 
-    labs(x = x_lab, y = y_lab, title = "") + 
-    theme_bw() + theme(aspect.ratio = 1,
-                       panel.background = element_rect(fill = NA),
-                       strip.text = element_text(size=12,color="black",face='bold'),
-                       axis.title = element_text(size=12,color="black",face='bold'),
-                       axis.text = element_text(size=12,color="black",face='bold'),
-                       axis.text.x = element_text(size=12,color="black",face='bold'),
-                       axis.text.y = element_text(size=12,color="black",face='bold'),
-                       legend.text = element_text(size=12,color="black",face='bold'),
-                       legend.title = element_text(size=12,color="black",face='bold'),
-                       title = element_text(size=12,color="black",face='bold')) 
-  }
-  
-  g <- plot_g1(wdat, x_lab, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","vaginal_fecal_by_birthmode_ape.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  
-  plot_g2 <- function(wdat, x_lab, y_lab){
-    ggplot(wdat, aes(x = PC1, y = PC2, color = grp2)) + 
-      geom_point() + 
-      scale_color_manual(values = c("Mom-vagina-day0"="Gray50", "pup-Week3"="#c7e9b4", 
-                                    "pup-Week6"="#7fcdbb", "pup-Week9-14"="#41b6c4",
-                                    "pup-Week18"="#2c7fb8"),name = "") + 
-      labs(x = x_lab, y = y_lab, title = "") + 
-      theme_bw() + theme(aspect.ratio = 1,
-                         panel.background = element_rect(fill = NA),
-                         strip.text = element_text(size=12,color="black",face='bold'),
-                         axis.title = element_text(size=12,color="black",face='bold'),
-                         axis.text = element_text(size=12,color="black",face='bold'),
-                         axis.text.x = element_text(size=12,color="black",face='bold'),
-                         axis.text.y = element_text(size=12,color="black",face='bold'),
-                         legend.text = element_text(size=12,color="black",face='bold'),
-                         legend.title = element_text(size=12,color="black",face='bold'),
-                         title = element_text(size=12,color="black",face='bold')) 
-  }
-  
-  g <- plot_g2(wdat, x_lab, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","vaginal_fecal_by_Age_group_ape.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)  
-  
-  ## vegan::dbrda
-  wrda <- dbrda(wdist ~ 1)
-  wrda_eig <- eigenvals(wrda)
-  varPC1 <- round(wrda_eig[1]/sum(wrda_eig)*100,2)
-  varPC2 <- round(wrda_eig[2]/sum(wrda_eig)*100,2)
-  #wrda_fit <- envfit(wrda ~ BodySite + Sex, data = wmeta)
-  #ordiplot(wrda, display = "site")
-  #plot(wrda_fit)
-  wdat <- merge(wrda$CA$u[,1:2], wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
-    rename(PC1 = MDS1, PC2 = MDS2) %>% 
-    mutate(grp1 = ifelse(is.na(BirthMode),"Mom-vagina", str_c(BirthMode, "pup", BodySite, sep = "-")),
-           grp2 = ifelse(is.na(BirthMode),"Mom-vagina-day0", str_c("pup", Age_group, sep = "-")))
-  
-  x_lab <- paste0("PC1 (", varPC1, "%)")
-  y_lab <- paste0("PC2 (", varPC2, "%)")
-  g <- plot_g1(wdat,  x_lab, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","vaginal_fecal_by_birthmode_MDS_vegan.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  g <- plot_g2(wdat,  x_lab, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","vaginal_fecal_by_Age_group_MDS_vegan.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  
-  ## vegan::metaMDS
-  set.seed(1)
-  wnmds <- metaMDS(wdist, k = 2, try = 50, trymax = 100)
-  wnmds_fit <- envfit(wnmds ~ BodySite + Sex, data = wmeta)
-  #ordiplot(wnmds, display = "site")
-  #plot(wnmds_fit)
-  wdat <- merge(scores(wnmds,display = "site"), wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
-    rename(PC1 = NMDS1, PC2 = NMDS2) %>% 
-    mutate(grp1 = ifelse(is.na(BirthMode),"Mom-vagina", str_c(BirthMode, "pup", BodySite, sep = "-")),
-           grp2 = ifelse(is.na(BirthMode),"Mom-vagina-day0", str_c("pup", Age_group, sep = "-")))
-  x_lab <- "NMDS1"
-  y_lab <- "NMDS2"
-  g <- plot_g1(wdat,  x_lab, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","vaginal_fecal_by_birthmode_NMDS.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  g <- plot_g2(wdat,  x_lab, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","vaginal_fecal_by_Age_group_NMDS.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-}
-```
-
-## effect of birthmode, sex, Age_group on pups
-```{r}
-calcOmega2_dm <- function(x) {
-    # Computes the effect size omega^2 parital using the output from adonis test
-    # Args:
-    #   x: adonis output
-    # Returns:
-    #   A dataframe with calculated effect size omega^2 partial added to original dataframe
-    require(dplyr)
-    N_t = x["Total", ]$Df + 1
-    MSe = x["Residual", ]$SumOfSqs/x["Residual", ]$Df
-    out = x %>% as.data.frame %>% rownames_to_column(var = "Variable") %>% mutate(Omega2_partial = ifelse(is.na(`F`), NA, (SumOfSqs - Df * MSe)/(SumOfSqs + (N_t - Df) * MSe)))
-    return(out)
-}
-   
-for(dd in c("uu","wu","bray","jaccard")){
-  wdist <- get(paste0("DM_",dd))
-  wmeta <- meta_all %>% filter(SampleID %in% labels(wdist)) %>% 
-    filter(Generation == "F1")
-  wdist <- dist_subset(wdist, wmeta$SampleID)
-  ## dispersion of major variables
-  disper <- betadisper(wdist, wmeta$BirthMode)
-  d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
-    rownames_to_column(var = "Variable")
-  disper <- betadisper(wdist, wmeta$Sex)
-  d2 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
-    rownames_to_column(var = "Variable")
-  disper <- betadisper(wdist, wmeta$Age_group)
-  d3 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
-    rownames_to_column(var = "Variable")
-  write.csv(rbind(d1, d2, d3), 
-            file = paste0(temp_out,dd,"_","dispersion_test.csv"), quote = F, row.names = F)
-  ##pairwise adonis 
-  comp <- combn(wmeta$Age_group %>% unique() %>% as.character(),2)
-  res <- lapply(1:ncol(comp), function(i){
-    wwmeta <- wmeta %>% filter(Age_group %in% comp[,i])
-    wwdist <- dist_subset(wdist, wwmeta$SampleID)
-    calcOmega2_dm(adonis2(wwdist ~ Age_group, data = wwmeta, by = "terms")) %>% 
-      as.data.frame() %>% mutate(comp = str_c(comp[1,i], comp[2,i], sep = " - ")) %>% 
-      filter(!is.na(F))
-  })
-  res_Age_group <- do.call(rbind, res) %>% mutate(padj = p.adjust(`Pr(>F)`)) %>% dplyr::select(comp, everything())
-  
-  comp <- combn(wmeta$BirthMode %>% unique() %>% as.character(),2)
-  res <- lapply(1:ncol(comp), function(i){
-    wwmeta <- wmeta %>% filter(BirthMode %in% comp[,i])
-    wwdist <- dist_subset(wdist, wwmeta$SampleID)
-    calcOmega2_dm(adonis2(wwdist ~ BirthMode, data = wwmeta, by = "terms")) %>% 
-      as.data.frame() %>% mutate(comp = str_c(comp[1,i], comp[2,i], sep = " - ")) %>% 
-      filter(!is.na(F))
-  })
-  res_birthmode <- do.call(rbind, res) %>% mutate(padj = p.adjust(`Pr(>F)`)) %>% 
-    dplyr::select(comp, everything())
-  write.csv(rbind(res_Age_group, res_birthmode), 
-            file = paste0(temp_out,dd,"_","pairwise_adonis_Age_group_birthmode.csv"), 
-            quote = F, row.names = F)
-  ## adonis test
-  res_all = list()
-  per <- adonis2(wdist ~ BirthMode + Age_group + Sex, data = wmeta, by = "margin")
+  ## adonis of major variables
+  per <- adonis2(wdist ~ PCRConc+heat_inactivated+Extraction_method+Country, 
+                 data = wmeta, by = "margin")
   res = calcOmega2_dm(per)
-  res$BirthMode <- "All"
-  res$Age_group <- "All"
-  res$Sex <- "All"
-  res$fo <- "BirthMode + Age_group + Sex"
-  res_all <-list.append(res_all, res)
-  for (tp in wmeta$Age_group %>% unique()){
-    wwmeta <- wmeta %>% filter(Age_group == tp)
-    wwdist <- dist_subset(wdist, wwmeta$SampleID)
-    res <- calcOmega2_dm(adonis2(wwdist ~ BirthMode + Sex, data = wwmeta, by = "margin"))
-    res$BirthMode <- "All"
-    res$Age_group <- tp
-    res$Sex <- "All"
-    res$fo <- "BirthMode + Sex"
-    res_all <-list.append(res_all, res)
-    for (ss in wmeta$Sex %>% unique()){
-      wwmeta <- wmeta %>% filter(Age_group == tp, Sex == ss)
-      wwdist <- dist_subset(wdist, wwmeta$SampleID)
-      res <- calcOmega2_dm(adonis2(wwdist ~ BirthMode, data = wwmeta, by = "margin"))
-      res$BirthMode <- "All"
-      res$Age_group <- tp
-      res$Sex <- ss
-      res$fo <- "BirthMode"
-      res_all <-list.append(res_all, res)
-    }
-    for (bm in wmeta$BirthMode %>% unique()){
-      wwmeta <- wmeta %>% filter(Age_group == tp, BirthMode == bm)
-      wwdist <- dist_subset(wdist, wwmeta$SampleID)
-      res <- calcOmega2_dm(adonis2(wwdist ~ Sex, data = wwmeta, by = "margin"))
-      res$BirthMode <- bm
-      res$Age_group <- tp
-      res$Sex <- "All"
-      res$fo <- "Sex"
-      res_all <-list.append(res_all, res)
-    }
-  }
-  for (bm in wmeta$BirthMode %>% unique()){
-    wwmeta <- wmeta %>% filter(BirthMode == bm)
-    wwdist <- dist_subset(wdist, wwmeta$SampleID)
-    res <- calcOmega2_dm(adonis2(wwdist ~ Age_group + Sex, data = wwmeta, by = "margin"))
-    res$BirthMode <- bm
-    res$Age_group <- "All"
-    res$Sex <- "All"
-    res$fo <- "Age_group + Sex"
-    res_all <-list.append(res_all, res)  
-  }
-  for (ss in wmeta$Sex %>% unique()){
-    wwmeta <- wmeta %>% filter(Sex == ss)
-    wwdist <- dist_subset(wdist, wwmeta$SampleID)
-    res <- calcOmega2_dm(adonis2(wwdist ~ Age_group + BirthMode, data = wwmeta, by = "margin"))
-    res$BirthMode <- "All"
-    res$Age_group <- "All"
-    res$Sex <- ss
-    res$fo <- "Age_group + BirthMode"
-    res_all <-list.append(res_all, res)  
-  }  
-  res <- do.call(rbind, res_all)
-  res <- res %>% filter(!is.na(F)) %>% 
-    mutate(padj = p.adjust(`Pr(>F)`)) %>% 
-    dplyr::select(fo, BirthMode, Age_group, Sex, Variable, Df, SumOfSqs, R2, Omega2_partial, `F`, `Pr(>F)`, padj)
-  write.csv(res, file = paste0(temp_out,dd,"_","adonis_all.csv"), quote = F, row.names = F)
+  write.csv(res, 
+            file = paste0(temp_out,dd,"_","adonis_test_overall.csv"), quote = F, row.names = F)
 }
 ```
 
-## plot pups PCoA use vegan mds, nmds
+## beta in Global project
 ```{r}
+meta <- phylo_decontam_clean_rf@sam_data@.Data %>% as.data.frame()
+names(meta) <- phylo_decontam_clean_rf@sam_data@names
+meta$SampleID <- phylo_decontam_clean_rf@sam_data@row.names
+
+meta <- rbind(meta %>% filter(!is.na(Country), Project %in% c("Global", "Upside", "Milkbank")),
+             meta %>% filter(!is.na(Country), Project  %in% c("Covid Mom", "Family", "PR")) %>%
+               filter(TimePoint == 1200))
+
 for(dd in c("uu","wu","bray","jaccard")){
   wdist <- get(paste0("DM_",dd))
-  wmeta <- meta_all %>% filter(SampleID %in% labels(wdist)) %>% 
-    filter(Generation == "F1")
-  wdist <- dist_subset(wdist, wmeta$SampleID)
-
-  wrda <- dbrda(wdist ~ 1)
+  wmeta = meta %>% filter(SampleID %in% labels(wdist))
+  wdist <- dist_subset(wdist, wmeta$SampleID)  
+  wrda <- dbrda(wdist ~ 1, sqrt.dist = TRUE)
   wrda_eig <- eigenvals(wrda)
   varPC1 <- round(wrda_eig[1]/sum(wrda_eig)*100,2)
   varPC2 <- round(wrda_eig[2]/sum(wrda_eig)*100,2)
-  wrda_fit <- envfit(wrda ~ BirthMode + Sex + Age_group, data = wmeta)
+  wrda_fit <- envfit(wrda ~ Country, data = wmeta)
   wdat_rda <- merge(wrda$CA$u[,1:2], wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
     rename(PC1 = MDS1, PC2 = MDS2)
   x_lab <- paste0("PC1 (", varPC1, "%)")
-  y_lab <- paste0("PC2 (", varPC2, "%)")
-  
-  #Pcoa Age_group
-  plot_Age_group_pcoa <- function(wdat, x_lab, y_lab){
-    ggplot(wdat, aes(x = PC1, y = PC2, color = Age_group)) + 
-      geom_point(aes(shape = BirthMode), size = 2) + 
-      stat_ellipse(type = "t") + 
-      scale_color_manual(values = Age_color) + 
+  y_lab <- paste0("PC2 (", varPC2, "%)")  
+  g <- ggplot(wdat_rda, aes(x = PC1, y = PC2, color = Country)) + 
+      geom_point(size = 2) + 
+      scale_color_manual(values = Country_color) + 
       labs(x = x_lab, y = y_lab, title = "") +
-      theme_bw() + theme(aspect.ratio = 1,
+      theme_bw() + theme(#aspect.ratio = 1,
                            panel.background = element_rect(fill = NA),
                            strip.text = element_text(size=12,color="black",face='bold'),
                            axis.title = element_text(size=12,color="black",face='bold'),
@@ -346,106 +114,14 @@ for(dd in c("uu","wu","bray","jaccard")){
                            legend.text = element_text(size=12,color="black",face='bold'),
                            legend.title = element_text(size=12,color="black",face='bold'),
                            title = element_text(size=12,color="black",face='bold'))    
-  }
-  g <- plot_Age_group_pcoa(wdat_rda, x_lab, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_Age_group_pcoa.pdf"), device = cairo_pdf, 
+  ggsave(filename = paste0(temp_out,dd,"_Global_by_country.pdf"), device = cairo_pdf, 
            plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  #PC1 by Age_group
-  plot_Age_group_pc1 <- function(wdat, x_lab){
-    ggplot(wdat, aes(x = Age_group, y = PC1)) + 
-      geom_boxplot(aes(color=BirthMode, fill=BirthMode), alpha = 0.5, outlier.alpha = 0) + 
-      geom_point(aes(color=BirthMode), position = position_dodge2(width = 0.6)) + 
-      stat_compare_means(aes(group = BirthMode), hide.ns = T, label =  "p.signif") +
-      scale_color_manual(values = BirthMode_color, aesthetics = c("color","fill")) + 
-      labs(x="",y=x_lab) + 
-      coord_flip() +
-      theme_bw() + theme(aspect.ratio = 1,
-                           panel.background = element_rect(fill = NA),
-                           strip.text = element_text(size=12,color="black",face='bold'),
-                           axis.title = element_text(size=12,color="black",face='bold'),
-                           axis.text = element_text(size=12,color="black",face='bold'),
-                           axis.text.x = element_text(size=12,color="black",face='bold'),
-                           axis.text.y = element_text(size=12,color="black",face='bold'),
-                           legend.text = element_text(size=12,color="black",face='bold'),
-                           legend.title = element_text(size=12,color="black",face='bold'),
-                           title = element_text(size=12,color="black",face='bold'))
-  }
-  g <- plot_Age_group_pc1(wdat_rda, x_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_Age_group_pc1.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  #PC2 by Age_group
-  plot_Age_group_pc2 <- function(wdat, y_lab){
-  g <- ggplot(wdat, aes(x = Age_group, y = PC2)) + 
-    geom_boxplot(aes(color=BirthMode, fill=BirthMode), alpha = 0.5, outlier.alpha = 0) + 
-    geom_point(aes(color=BirthMode), position = position_dodge2(width = 0.6)) + 
-    stat_compare_means(aes(group = BirthMode), hide.ns = T, label =  "p.signif") +
-    scale_color_manual(values = BirthMode_color, aesthetics = c("color","fill")) + 
-    labs(x="",y=y_lab) + 
-    theme_bw() + theme(aspect.ratio = 1,
-                         panel.background = element_rect(fill = NA),
-                         strip.text = element_text(size=12,color="black",face='bold'),
-                         axis.title = element_text(size=12,color="black",face='bold'),
-                         axis.text = element_text(size=12,color="black",face='bold'),
-                         axis.text.x = element_text(size=12,color="black",face='bold'),
-                         axis.text.y = element_text(size=12,color="black",face='bold'),
-                         legend.text = element_text(size=12,color="black",face='bold'),
-                         legend.title = element_text(size=12,color="black",face='bold'),
-                         title = element_text(size=12,color="black",face='bold'))
-  }
-  g <- plot_Age_group_pc2(wdat_rda, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_Age_group_pc2.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)  
-  ##Poca birthmode
-  plot_birthmode_pcoa <- function(wdat, x_lab, y_lab){
-    ggplot(wdat, aes(x = PC1, y = PC2, color = BirthMode)) + 
-      geom_point( size = 2) + 
-      stat_ellipse(type = "t") + 
-      scale_color_manual(values = BirthMode_color) + 
-      labs(x = x_lab, y = y_lab, title = "") +
-      theme_bw() + theme(aspect.ratio = 1,
-                           panel.background = element_rect(fill = NA),
-                           strip.text = element_text(size=12,color="black",face='bold'),
-                           axis.title = element_text(size=12,color="black",face='bold'),
-                           axis.text = element_text(size=12,color="black",face='bold'),
-                           axis.text.x = element_text(size=12,color="black",face='bold'),
-                           axis.text.y = element_text(size=12,color="black",face='bold'),
-                           legend.text = element_text(size=12,color="black",face='bold'),
-                           legend.title = element_text(size=12,color="black",face='bold'),
-                           title = element_text(size=12,color="black",face='bold'))
-  }
-  g <- plot_birthmode_pcoa(wdat_rda, x_lab, y_lab) 
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_pcoa.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  ##Poca birthmode by Age_group
-  plot_birthmode_pcoa_Age_group <- function(wdat, x_lab, y_lab){
-    ggplot(wdat, aes(x = PC1, y = PC2, color = BirthMode)) + 
-      geom_point( size = 2) + 
-      stat_ellipse(type = "t") + 
-      scale_color_manual(values = BirthMode_color) + 
-      labs(x = x_lab, y = y_lab, title = "") + 
-      facet_wrap(~Age_group, nrow = 2) + 
-      theme_bw() + theme(aspect.ratio = 1,
-                           panel.background = element_rect(fill = NA),
-                           strip.text = element_text(size=12,color="black",face='bold'),
-                           axis.title = element_text(size=12,color="black",face='bold'),
-                           axis.text = element_text(size=12,color="black",face='bold'),
-                           axis.text.x = element_text(size=12,color="black",face='bold'),
-                           axis.text.y = element_text(size=12,color="black",face='bold'),
-                           legend.text = element_text(size=12,color="black",face='bold'),
-                           legend.title = element_text(size=12,color="black",face='bold'),
-                           title = element_text(size=12,color="black",face='bold'))
-  }
-  g <- plot_birthmode_pcoa_Age_group(wdat_rda, x_lab, y_lab)   
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_Age_group_pcoa.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  ##Poca sex
-  plot_sex_pcoa <- function(wdat, x_lab, y_lab){
-    ggplot(wdat, aes(x = PC1, y = PC2, color = Sex)) + 
+  
+  g <- ggplot(wdat_rda, aes(x = PC1, y = PC2, color = Continent)) + 
       geom_point(size = 2) + 
-      stat_ellipse(type = "t") + 
-      scale_color_manual(values = Sex_color, labels = Sex_labs) + 
+      scale_color_manual(values = Continent_color) + 
       labs(x = x_lab, y = y_lab, title = "") +
-      theme_bw() + theme(aspect.ratio = 1,
+      theme_bw() + theme(#aspect.ratio = 1,
                            panel.background = element_rect(fill = NA),
                            strip.text = element_text(size=12,color="black",face='bold'),
                            axis.title = element_text(size=12,color="black",face='bold'),
@@ -454,121 +130,23 @@ for(dd in c("uu","wu","bray","jaccard")){
                            axis.text.y = element_text(size=12,color="black",face='bold'),
                            legend.text = element_text(size=12,color="black",face='bold'),
                            legend.title = element_text(size=12,color="black",face='bold'),
-                           title = element_text(size=12,color="black",face='bold'))
-  }
-  g <- plot_sex_pcoa(wdat_rda, x_lab, y_lab) 
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_sex_pcoa.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  ##Poca sex by Age_group
-  plot_sex_pcoa_Age_group <- function(wdat, x_lab, y_lab){
-    ggplot(wdat, aes(x = PC1, y = PC2, color = Sex)) + 
-      geom_point( size = 2) + 
-      stat_ellipse(type = "t") + 
-      scale_color_manual(values = Sex_color, labels = Sex_labs) + 
-      labs(x = x_lab, y = y_lab, title = "") + 
-      facet_wrap(~Age_group, nrow = 2) + 
-      theme_bw() + theme(aspect.ratio = 1,
-                           panel.background = element_rect(fill = NA),
-                           strip.text = element_text(size=12,color="black",face='bold'),
-                           axis.title = element_text(size=12,color="black",face='bold'),
-                           axis.text = element_text(size=12,color="black",face='bold'),
-                           axis.text.x = element_text(size=12,color="black",face='bold'),
-                           axis.text.y = element_text(size=12,color="black",face='bold'),
-                           legend.text = element_text(size=12,color="black",face='bold'),
-                           legend.title = element_text(size=12,color="black",face='bold'),
-                           title = element_text(size=12,color="black",face='bold'))
-  }
-  g <- plot_sex_pcoa_Age_group(wdat_rda, x_lab, y_lab)   
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_sex_Age_group_pcoa.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  #explore birthmode effect on PCs
-  wdat <- merge(wrda$CA$u[,1:9], wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
-    dplyr::select(BirthMode, Sex, Age_group, MDS1:MDS9) %>% 
-    pivot_longer(MDS1:MDS9, names_to = "PC")
-  g <- ggplot(wdat, aes(x = Age_group, y = value, )) + 
-    geom_boxplot(aes(fill=BirthMode)) + 
-    stat_compare_means(aes(group=BirthMode), hide.ns = T, label = "p.format") + 
-    labs(x="", y="", title = "") + 
-    facet_wrap(~PC, nrow = 3)
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_Age_group_9D.pdf"), device = cairo_pdf, 
-           plot = g, width = 14, height = 10, units = "in", dpi = 300)  
-  g <- ggplot(wdat, aes(x = BirthMode, y = value, )) + 
-    geom_boxplot(aes(fill=BirthMode)) + 
-    stat_compare_means(aes(group=BirthMode), hide.ns = T, label = "p.format") + 
-    labs(x="", y="", title = "") + 
-    facet_wrap(~PC, nrow = 3)
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_9D.pdf"), device = cairo_pdf, 
-           plot = g, width = 14, height = 10, units = "in", dpi = 300)
-  ############ NMDS
+                           title = element_text(size=12,color="black",face='bold'))  
+  ggsave(filename = paste0(temp_out,dd,"_Global_by_continent.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 5, units = "in", dpi = 300) 
+  #NMDS
   set.seed(1)
-  wnmds <- metaMDS(wdist, k = 2, try = 50, trymax = 100)
-  wnmds_fit <- envfit(wnmds ~ BirthMode + Sex + Age_group, data = wmeta)
+  wnmds <- metaMDS(wdist, k = 2, try = 20, trymax = 20)
+  wnmds_fit <- envfit(wnmds ~ Country, data = wmeta)
   wdat_nmds <- merge(scores(wnmds,display = "site"), wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
-    rename(PC1 = NMDS1, PC2 = NMDS2) 
+    rename(PC1 = NMDS1, PC2 = NMDS2)
   x_lab <- "NMDS1"
   y_lab <- "NMDS2"
-  g <- plot_Age_group_pcoa(wdat_nmds, x_lab, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_Age_group_nmds.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)  
-  g <- plot_Age_group_pc1(wdat_nmds, x_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_Age_group_nmds1.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  g <- plot_Age_group_pc2(wdat_nmds, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_Age_group_nmds2.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)      
-  g <- plot_birthmode_pcoa(wdat_nmds, x_lab, y_lab) 
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_nmds.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  g <- plot_birthmode_pcoa_Age_group(wdat_nmds, x_lab, y_lab)   
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_Age_group_nmds.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
-  g <- plot_sex_pcoa(wdat_nmds, x_lab, y_lab) 
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_sex_nmds.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)  
-  g <- plot_sex_pcoa_Age_group(wdat_nmds, x_lab, y_lab)   
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_sex_Age_group_nmds.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300) 
-}
-```
-
-## overweight
-```{r}
-wmeta <- meta_all %>% left_join(at_week15 %>% dplyr::select(MouseID, BW_status, Overweight, Underweight), 
-                        by = "MouseID") %>% filter(!is.na(BW_status))
-
-for(dd in c("uu","wu","bray","jaccard")){
-  wdist <- get(paste0("DM_",dd))
-  wmeta <- wmeta %>% filter(SampleID %in% labels(wdist)) 
-  wdist <- dist_subset(wdist, wmeta$SampleID)
-  ##
-  disper <- betadisper(wdist, wmeta$Overweight)
-  d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
-    rownames_to_column(var = "Variable")
-  write.csv(d1, file = paste0(temp_out,dd,"_","Overweight_dispersion_test.csv"), 
-            quote = F, row.names = F)
-  ##
-  per <- adonis2(wdist ~ Overweight+BirthMode+Age_group+Sex, data = wmeta, by = "margin")
-  res = calcOmega2_dm(per)
-  write.csv(res, file = paste0(temp_out,dd,"_","Overweight_adonis_test.csv"))
-  ## pcoa
-  wrda <- dbrda(wdist ~ 1)
-  wrda_eig <- eigenvals(wrda)
-  varPC1 <- round(wrda_eig[1]/sum(wrda_eig)*100,2)
-  varPC2 <- round(wrda_eig[2]/sum(wrda_eig)*100,2)
-  wrda_fit <- envfit(wrda ~ Overweight + BirthMode + Sex + Age_group, data = wmeta)
-  wdat_rda <- merge(wrda$CA$u[,1:2], wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
-    rename(PC1 = MDS1, PC2 = MDS2)
-  x_lab <- paste0("PC1 (", varPC1, "%)")
-  y_lab <- paste0("PC2 (", varPC2, "%)")
   
-  g <- ggplot(wdat_rda, aes(x = PC1, y = PC2, color = Overweight)) + 
-      geom_point( size = 2) + 
-      stat_ellipse(type = "t") + 
-      scale_color_manual(values = c("Y"="#d73027", "N"="#1a9850"), 
-                         name = "Overweight") + 
-      labs(x = x_lab, y = y_lab, title = "") + 
-      facet_wrap(~Age_group, nrow = 2) + 
-      theme_bw() + theme(aspect.ratio = 1,
+  g <- ggplot(wdat_nmds, aes(x = PC1, y = PC2, color = Country)) + 
+      geom_point(size = 2) + 
+      scale_color_manual(values = Country_color) + 
+      labs(x = x_lab, y = y_lab, title = "") +
+      theme_bw() + theme(#aspect.ratio = 1,
                            panel.background = element_rect(fill = NA),
                            strip.text = element_text(size=12,color="black",face='bold'),
                            axis.title = element_text(size=12,color="black",face='bold'),
@@ -577,22 +155,25 @@ for(dd in c("uu","wu","bray","jaccard")){
                            axis.text.y = element_text(size=12,color="black",face='bold'),
                            legend.text = element_text(size=12,color="black",face='bold'),
                            legend.title = element_text(size=12,color="black",face='bold'),
-                           title = element_text(size=12,color="black",face='bold'))
-  ggsave(filename = paste0(temp_out,dd,"_","pup_Overweight_by_Age_group_pcoa.pdf"), device = cairo_pdf, 
+                           title = element_text(size=12,color="black",face='bold'))    
+  ggsave(filename = paste0(temp_out,dd,"_Global_by_country_nmds.pdf"), device = cairo_pdf, 
            plot = g, width = 7, height = 5, units = "in", dpi = 300)
+  
+  g <- ggplot(wdat_nmds, aes(x = PC1, y = PC2, color = Continent)) + 
+      geom_point(size = 2) + 
+      scale_color_manual(values = Continent_color) + 
+      labs(x = x_lab, y = y_lab, title = "") +
+      theme_bw() + theme(#aspect.ratio = 1,
+                           panel.background = element_rect(fill = NA),
+                           strip.text = element_text(size=12,color="black",face='bold'),
+                           axis.title = element_text(size=12,color="black",face='bold'),
+                           axis.text = element_text(size=12,color="black",face='bold'),
+                           axis.text.x = element_text(size=12,color="black",face='bold'),
+                           axis.text.y = element_text(size=12,color="black",face='bold'),
+                           legend.text = element_text(size=12,color="black",face='bold'),
+                           legend.title = element_text(size=12,color="black",face='bold'),
+                           title = element_text(size=12,color="black",face='bold'))  
+  ggsave(filename = paste0(temp_out,dd,"_Global_by_continent_nmds.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 5, units = "in", dpi = 300)   
 }
-
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
