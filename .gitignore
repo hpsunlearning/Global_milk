@@ -43,4 +43,4 @@ vignettes/*.pdf
 .DS_Store?
 ._*
 thumbs.db
-Thumbs.db.Rproj.user
+Thumbs.db
