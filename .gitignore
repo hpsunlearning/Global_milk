@@ -44,3 +44,4 @@ vignettes/*.pdf
 ._*
 thumbs.db
 Thumbs.db
+.DS_Store
