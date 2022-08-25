@@ -35,12 +35,12 @@ names(Country_color) <- c("Guinea Ecuatorial", "Kenya", "Senegal", "South Sudan"
                           "Ecuador", "ElSalvador", "Mexico", "Peru", "Puerto Rico", "United States",
                           "Austria", "Germany", "Netherlands", "Norway", "Spain") 
 #ggplot(data.frame(country = names(Country_color), y = rep(1, 16))) + geom_col(aes(x=country, y=y, color=country, fill=country)) + scale_color_manual(values = Country_color, aesthetics = c("color","fill"))
-country_font_color = c("Guinea Ecuatorial"="#1b9e77", "Kenya"="#1b9e77", "Senegal"="#1b9e77", "South Sudan"="#1b9e77", "Tanzania"="#1b9e77",
+Country_font_color = c("Guinea Ecuatorial"="#1b9e77", "Kenya"="#1b9e77", "Senegal"="#1b9e77", "South Sudan"="#1b9e77", "Tanzania"="#1b9e77",
                        "Ecuador"="#7570b3", "ElSalvador"="#7570b3", "Mexico"="#7570b3", "Peru"="#7570b3", "Puerto Rico"="#7570b3", "United States"="#7570b3",
                        "Austria"="#d95f02", "Germany"="#d95f02", "Netherlands"="#d95f02", "Norway"="#d95f02", "Spain"="#d95f02")
 
-country_labels = glue("<span style='color:{country_font_color}'>{names(country_font_color)}</span>")
-names(country_labels) <- names(country_font_color)
+Country_labels = glue("<span style='color:{Country_font_color}'>{names(Country_font_color)}</span>")
+names(Country_labels) <- names(Country_font_color)
 ```
 
 ## functions
