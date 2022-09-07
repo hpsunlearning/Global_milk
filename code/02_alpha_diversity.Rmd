@@ -327,11 +327,11 @@ metric <- names(alpha_boot)[2:5]
 names(metric) <- names(alpha_boot)[2:5]
 
 dat <- rbind(dat_alpha %>% filter(!is.na(Country), Project %in% c("Global", "Upside", "Milkbank")),
-             #dat_alpha %>% filter(!is.na(Country), Project  %in% c("Covid Mom", "Family", "PR")) %>%
              dat_alpha %>% filter(!is.na(Country), Project=="PR") %>%
                filter(TimePoint == 1200))
 
-table(dat$Continent, dat$Country)
+a <- table(dat$Continent, dat$Country) %>% as.data.frame() %>% filter(Freq>0)
+write.csv(a, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/Global_samples_by_Country.csv",row.names = FALSE)
 
 # Country
 alpha_Country_grp <- map_dfr(metric, function(a){
@@ -361,9 +361,7 @@ alpha_Country_summary <- dat %>% dplyr::select(Faith_PD:Pielou_evenness, Country
 
 wdat <- dat %>% 
   mutate(Country = factor(Country,
-                          levels = c("Guinea Ecuatorial", "Kenya", "Senegal", "South Sudan", "Tanzania",
-                                     "Ecuador", "ElSalvador", "Mexico", "Peru", "Puerto Rico", "United States",
-                                     "Austria", "Germany", "Netherlands", "Norway", "Spain"),
+                          levels = names(Country_color),
                           ordered = T)) %>% 
   dplyr::select(SampleID, Country, Faith_PD:Pielou_evenness) %>% 
   pivot_longer(Faith_PD:Pielou_evenness, names_to = "Metrics", values_to = "value")
@@ -389,6 +387,36 @@ g <- ggplot(wdat, aes(Country, value)) +
                      legend.title = element_text(size=12,color="black",face='bold'),
                      title = element_text(size=12,color="black",face='bold'))
 ggsave(filename = paste0(temp_out, "alpha_by_Country_full.pdf"), device = cairo_pdf, 
+         plot = g, width = 14, height = 10, units = "in", dpi = 300) 
+
+# order by faith PD
+Country_ord <- alpha_Country_summary %>% filter(Metrics == "Faith_PD") %>% 
+  dplyr::select(Country, Med) %>% 
+  left_join(meta_all %>% dplyr::select(Country, Continent) %>% unique(), by = "Country") %>% 
+  arrange(Continent, desc(Med)) %>% pull(Country)
+wdat$Country = factor(wdat$Country, levels = Country_ord, ordered = T)
+
+g <- ggplot(wdat, aes(Country, value)) + 
+  geom_boxplot(aes(color = Country, fill = Country),alpha = 0.7,  outlier.alpha = 0) + 
+  geom_point(aes(color = Country), position = position_jitterdodge()) + 
+  geom_text(data = alpha_Country_summary, 
+            aes(x =  Country, y = 1.08 * Max, label = KW_group)) + 
+  scale_color_manual(values = Country_color, aesthetics = c("color","fill")) + 
+  scale_x_discrete(labels=Country_labels) + 
+  labs(x = "", y = "") +
+  facet_wrap(~Metrics, nrow = 2, scales = "free") +
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_markdown(size=12, face='bold',angle=90,vjust = 0.5, hjust = 1),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = paste0(temp_out, "alpha_by_Country_full_sort_by_faith.pdf"), device = cairo_pdf, 
          plot = g, width = 14, height = 10, units = "in", dpi = 300) 
 
 for (a in metric){
@@ -417,11 +445,11 @@ for (a in metric){
                      legend.title = element_text(size=12,color="black",face='bold'),
                      title = element_text(size=12,color="black",face='bold'))
   ggsave(filename = paste0(temp_out, "alpha_by_Country_", a, "_ordered.pdf"), device = cairo_pdf, 
-         plot = g, width = 14, height = 10, units = "in", dpi = 300) 
+         plot = g, width = 7, height = 5, units = "in", dpi = 300) 
 }
 
 alpha_lm_coef <- map_dfr(metric, function(a){
-  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + Country + Extraction_method")), data = dat)
+  fit <- lm(as.formula(paste0(a, "  ~ Country")), data = dat)
   anova_fit <- anova(fit)
   sum_fit <- summary(fit)
   effect_fit <- effectsize(anova_fit, "omega")
@@ -433,10 +461,10 @@ alpha_lm_coef <- map_dfr(metric, function(a){
   res_coef
 })
 write.csv(alpha_lm_coef, row.names = FALSE,
-          file = paste0(temp_out,"alpha_lm_global_project_Country_conc_method_all_coef.csv"))
+          file = paste0(temp_out,"alpha_lm_global_project_Country_only_coef.csv"))
 
 alpha_lm_omega <- map_dfr(metric, function(a){
-  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + Country + Extraction_method")), data = dat)
+  fit <- lm(as.formula(paste0(a, "  ~ Country")), data = dat)
   anova_fit <- anova(fit)
   sum_fit <- summary(fit)
   effect_fit <- effectsize(anova_fit, "omega")
@@ -448,7 +476,7 @@ alpha_lm_omega <- map_dfr(metric, function(a){
   res_anova
 })
 write.csv(alpha_lm_omega, row.names = FALSE,
-          file = paste0(temp_out,"alpha_lm_global_project_Country_conc_method_all_omega.csv"))
+          file = paste0(temp_out,"alpha_lm_global_project_Country_only_omega.csv"))
 
 # Continent
 alpha_Continent_grp <- map_dfr(metric, function(a){
@@ -504,7 +532,7 @@ ggsave(filename = paste0(temp_out, "alpha_by_Continent_full.pdf"), device = cair
          plot = g, width = 14, height = 10, units = "in", dpi = 300) 
 
 alpha_lm_coef <- map_dfr(metric, function(a){
-  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + Continent + Extraction_method")), data = dat)
+  fit <- lm(as.formula(paste0(a, "  ~ Continent")), data = dat)
   anova_fit <- anova(fit)
   sum_fit <- summary(fit)
   effect_fit <- effectsize(anova_fit, "omega")
@@ -516,10 +544,10 @@ alpha_lm_coef <- map_dfr(metric, function(a){
   res_coef
 })
 write.csv(alpha_lm_coef, row.names = FALSE,
-          file = paste0(temp_out,"alpha_lm_global_project_Continent_conc_method_all_coef.csv"))
+          file = paste0(temp_out,"alpha_lm_global_project_Continent_only_coef.csv"))
 
 alpha_lm_omega <- map_dfr(metric, function(a){
-  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + Continent + Extraction_method")), data = dat)
+  fit <- lm(as.formula(paste0(a, "  ~ Continent")), data = dat)
   anova_fit <- anova(fit)
   sum_fit <- summary(fit)
   effect_fit <- effectsize(anova_fit, "omega")
@@ -531,7 +559,7 @@ alpha_lm_omega <- map_dfr(metric, function(a){
   res_anova
 })
 write.csv(alpha_lm_omega, row.names = FALSE,
-          file = paste0(temp_out,"alpha_lm_global_project_Continent_conc_method_all_omega.csv"))
+          file = paste0(temp_out,"alpha_lm_global_project_Continent_only_omega.csv"))
 
 ```
 

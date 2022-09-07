@@ -20,6 +20,7 @@ library(rlist)
 library(usedist)
 library(ggtext)
 library(glue)
+library(RColorBrewer)
 library(tidyverse)
 ```
 
@@ -29,18 +30,27 @@ library(tidyverse)
 path_rec <- "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/"
 temp_out <- paste0(path_rec, "result/")
 # set colors, labs and so on
+col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
+               brewer.pal(8, "Set2"), brewer.pal(7, "Accent")) %>% unique()
+names(col_vector) = col_vector
+#g <- ggplot(data.frame(name=col_vector, y = rep(1, length(col_vector)))) + geom_col(aes(x=name, y=y, color=name, fill=name)) + scale_color_manual(values = col_vector, aesthetics = c("color","fill")) + theme(axis.text.x = element_text(angle=90, vjust = 0.5, hjust = 1))
+#ggsave("~/Desktop/col_vector.pdf", plot = g, device = "pdf")
+#rm(g)
+
 Continent_color <- c("AFRICA"="#7fc97f", "AMERICA"="#beaed4", "EUROPE"="#fdc086")
-Country_color <- c(RColorBrewer::brewer.pal(12, "Set3"), RColorBrewer::brewer.pal(4, "Dark2"))
-names(Country_color) <- c("Guinea Ecuatorial", "Kenya", "Senegal", "South Sudan", "Tanzania",
-                          "Ecuador", "ElSalvador", "Mexico", "Peru", "Puerto Rico", "United States",
-                          "Austria", "Germany", "Netherlands", "Norway", "Spain") 
-#ggplot(data.frame(country = names(Country_color), y = rep(1, 16))) + geom_col(aes(x=country, y=y, color=country, fill=country)) + scale_color_manual(values = Country_color, aesthetics = c("color","fill"))
+Country_color <- c("Guinea Ecuatorial"="#B2DF8A","Kenya"="#33A02C","Senegal"="#A6D854","South Sudan"="#7FC97F","Tanzania"="#66C2A5",
+                   "Ecuador"="#CAB2D6","ElSalvador"="#6A3D9A","Mexico"="#BC80BD","Peru"="#8DA0CB","Puerto Rico"="#A6CEE3","United States"="#FB9A99",
+                   "Austria"="#E5C494","Germany"="#BF5B17","Netherlands"="#FF7F00","Norway"="#FB8072", "Spain"="#FDB462") 
+
 Country_font_color = c("Guinea Ecuatorial"="#1b9e77", "Kenya"="#1b9e77", "Senegal"="#1b9e77", "South Sudan"="#1b9e77", "Tanzania"="#1b9e77",
                        "Ecuador"="#7570b3", "ElSalvador"="#7570b3", "Mexico"="#7570b3", "Peru"="#7570b3", "Puerto Rico"="#7570b3", "United States"="#7570b3",
                        "Austria"="#d95f02", "Germany"="#d95f02", "Netherlands"="#d95f02", "Norway"="#d95f02", "Spain"="#d95f02")
-
 Country_labels = glue("<span style='color:{Country_font_color}'>{names(Country_font_color)}</span>")
 names(Country_labels) <- names(Country_font_color)
+
+#ggplot(data.frame(country = factor(names(Country_color), levels = names(Country_color), ordered = T), y = rep(1, 16))) + 
+#  geom_col(aes(x=country, y=y, color=country, fill=country)) + scale_color_manual(values = Country_color, aesthetics = c("color","fill")) + 
+#  scale_x_discrete(labels=Country_labels) + theme(axis.text.x = element_markdown(size=12,face='bold',angle=90,vjust = 0.5, hjust = 1))
 ```
 
 ## functions
@@ -149,6 +159,16 @@ meta_all <- meta_all %>%
 rm(heated_sample)
 #2 add blanks info
 meta_all$Sample_or_Blank <- ifelse(str_detect(meta_all$SampleID, "blank"),T,F)
+#3 add different country group
+meta_all <- meta_all %>% mutate(Conti_grp = case_when(Continent == "AFRICA" ~ "Africa",
+                                              Continent == "EUROPE" ~ "Europe",
+                                              Country == "United States" ~ "United States",
+                                              Country == "Puerto Rico" ~ "Puerto Rico",
+                                              Continent == "AMERICA" & !Country %in% c("United States","Puerto Rico") ~ "Central and South America"))
+#4 mark if send for ITS
+temp <- read_excel("~/Dropbox/Rutgers/20220304_Milk_inventory/ITS_upside_removed/Metadata_global_milk_platemap.xlsx", sheet = "Global_milk_sample_mapping")
+meta_all <- meta_all %>% mutate(ITS = ifelse(SampleID %in% temp$TubeID, "Y", "N"))
+rm(temp)
 # replace samdata in phyloseq
 sample_data(phylo_all) <- sample_data(meta_all %>% column_to_rownames(var = "SampleID"))
 ```
@@ -171,13 +191,13 @@ taxa = taxa %>% mutate(ASV = str_c("asv_", 1:nrow(taxa)),
 ### decontam
 ```{r }
 library(decontam)
-contamdf <- isContaminant(phylo_all, method="prevalence",neg="Sample_or_Blank" )
+a0 <- isContaminant(phylo_all, method="prevalence",neg="Sample_or_Blank" )
 a1 <- isContaminant(phylo_all, method="combined", conc="PCRConc", neg="Sample_or_Blank")
 a2 <- isContaminant(phylo_all, method="minimum", conc="PCRConc", neg="Sample_or_Blank")
 a3 <- isContaminant(phylo_all, method="either", conc="PCRConc", neg="Sample_or_Blank")
 a4 <- isContaminant(phylo_all, method="both", conc="PCRConc", neg="Sample_or_Blank")
 
-prev <- contamdf %>% filter(contaminant) %>% rownames()
+prev <- a0 %>% filter(contaminant) %>% rownames()
 combined <- a1 %>% filter(contaminant) %>% rownames()
 minimum <- a2 %>% filter(contaminant) %>% rownames()
 either <- a3 %>% filter(contaminant) %>% rownames()
@@ -196,10 +216,11 @@ temp <- taxa %>% filter(id %in% unique(unlist(lst))) %>%
   select(taxa_long, prev, combined, minimum, either, both)
 write.csv(temp, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/decontam_details.csv", quote = F, row.names = F)
 
-# use prevalence method to decontam
+# use pre method to decontam
+contamdf <- a0
 contam_id <- contamdf %>% filter(contaminant) %>% rownames()
 phylo_decontam <- prune_taxa(!(taxa_names(phylo_all) %in% contam_id), phylo_all)
-rm(contamdf, contam_id, a1, a2, a3, a4, prev, combined, minimum, either, both, lst, temp)
+rm(contamdf, contam_id, a0,  a1, a2, a3, a4, prev, combined, minimum, either, both, lst, temp)
 ```
 
 ### filter unwanted taxa
@@ -260,12 +281,9 @@ rarecurve_data %>% ggplot(aes(x=Sample, y=Species, group=Site)) +
   labs(x = "Depth", y = "Number of ASVs") + 
   coord_cartesian(xlim = c(0,10000)) 
 
-```
-
 ### set depth to 2857
-```{r }
 depth = 2857
-coverage_stat %>%ggplot(aes(x=n_seqs, y=goods)) + 
+g <- coverage_stat %>%ggplot(aes(x=n_seqs, y=goods)) + 
   geom_point() + 
   geom_hline(yintercept = 99, color = "red") + 
   geom_label(data = data.frame(n_seqs = c(60000,12000), 
@@ -274,8 +292,10 @@ coverage_stat %>%ggplot(aes(x=n_seqs, y=goods)) +
              aes(label = label)) + 
   geom_vline(xintercept = depth, color = "black") + 
   labs(x = "Depth", y = "Goods coverage", title = "Goods coverage")
+ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/Goods_coverage_depth.pdf", 
+       device = cairo_pdf, plot = g, width = 7, height = 5, units = "in", dpi = 300)
 
-rarecurve_data %>% ggplot(aes(x=Sample, y=Species, group=Site)) + 
+g <- rarecurve_data %>% ggplot(aes(x=Sample, y=Species, group=Site)) + 
   geom_line(alpha = 0.3) + 
   geom_vline(xintercept = depth, color = "black") + 
   geom_label(data = data.frame(Sample = c(2600), 
@@ -286,13 +306,14 @@ rarecurve_data %>% ggplot(aes(x=Sample, y=Species, group=Site)) +
   scale_y_log10() +
   labs(x = "Depth", y = "Number of ASVs") + 
   coord_cartesian(xlim = c(0,5000)) 
-
+ggsave(filename = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/depth_rarefy.pdf", 
+       device = cairo_pdf, plot = g, width = 7, height = 5, units = "in", dpi = 300)
 
 phylo_decontam_clean_rf = rarefy_even_depth(phylo_decontam_clean, 
                                       sample.size = depth, 
                                       rngseed = 3, 
                                       replace = F)
-rm(ft, coverage_stat)
+rm(ft, coverage_stat, g)
 ```
 
 ## save data
@@ -399,6 +420,11 @@ a <- dat %>% filter(!is.na(TimePoint)) %>%
 write.csv(a, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/circadian_samples_by_project_N.csv",
           row.names = FALSE)
 # decided to include 1200 samples for global project
+#meta_global<- rbind(dat %>% filter(!is.na(Country), Project %in% c("Global", "Upside", "Milkbank")),
+#           dat %>% filter(!is.na(Country), Project=="PR") %>% filter(TimePoint == 1200))
+#a <- meta_global %>% group_by(Country) %>% summarise(N = n()) %>% ungroup() 
+#write.csv(a, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/Global_samples_by_Country.csv",
+#          row.names = FALSE)
 ```
 
 ### correlations 

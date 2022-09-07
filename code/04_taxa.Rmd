@@ -88,6 +88,8 @@ for (taxrank in c("ASV","Species","Genus", "Family")){
                     "Austria", "Germany", "Netherlands", "Norway", "Spain"),
            order.by = "freq", keep.order = TRUE,
       nsets = length(asv_lst),
+      mainbar.y.label = paste0(taxrank, " Intersections"),
+      sets.x.label = paste0(taxrank, " number by country"),
       nintersects = 40)  
   pdf(file = paste0(temp_out,"rarefied_sharing_", taxrank, ".pdf"), 
       width = 9, height = 7, useDingbats = F)
@@ -117,10 +119,10 @@ res <-  purrr::map_dfr(
       rbind(dat3, data.frame(id = "Other", RA = 1-sum(dat3$RA)))
       }, .id = "Country")
 
-res <- res %>% left_join(taxa %>% select(id, Phylum), by = "id") %>% 
+res <- res %>% left_join(taxa %>% dplyr::select(id, Phylum), by = "id") %>% 
   mutate(Taxa = ifelse(is.na(Phylum),"Other",Phylum))
 
-temp <- res %>% select(Taxa, RA) %>% group_by(Taxa) %>% dplyr::summarise(RA = mean(RA)) %>% arrange(desc(RA)) %>% filter(Taxa != "Other")
+temp <- res %>% dplyr::select(Taxa, RA) %>% group_by(Taxa) %>% dplyr::summarise(RA = mean(RA)) %>% arrange(desc(RA)) %>% filter(Taxa != "Other")
 
 
 col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
@@ -209,7 +211,7 @@ res <-  purrr::map_dfr(
 res <- res %>% left_join(taxa_temp, by = "id") %>% 
   mutate(Taxa = ifelse(is.na(taxa_long),"Other",taxa_long))
 
-temp <- res %>% select(Taxa, RA) %>% group_by(Taxa) %>% dplyr::summarise(RA = mean(RA)) %>% arrange(desc(RA)) %>% filter(Taxa != "Other")
+temp <- res %>% dplyr::select(Taxa, RA) %>% group_by(Taxa) %>% dplyr::summarise(RA = mean(RA)) %>% arrange(desc(RA)) %>% filter(Taxa != "Other")
 
 taxa_color <- c(col_vector[1:(nrow(temp))],"Gray50")
 names(taxa_color) <- c(temp$Taxa, "Other")
@@ -221,6 +223,7 @@ g <- ggplot(res %>% mutate(Taxa =  factor(Taxa, levels = names(taxa_color), orde
   labs(x = "", y = "Mean Relative Abundance") + 
   scale_fill_manual(values = taxa_color, name="") + 
   scale_y_continuous(expand=c(0,0)) + 
+  scale_x_discrete(labels=Country_labels) + 
   guides(fill = guide_legend(ncol = 1)) +
   theme_bw() + theme(aspect.ratio = 1.5,
                      panel.background = element_rect(fill = NA),
@@ -229,7 +232,7 @@ g <- ggplot(res %>% mutate(Taxa =  factor(Taxa, levels = names(taxa_color), orde
                      axis.line = element_blank(),
                      axis.ticks = element_blank(),
                      axis.text = element_text(size=12,color="black",face='bold'),
-                     axis.text.x = element_text(size=12,color="black",face='bold',
+                     axis.text.x = element_markdown(size=12,color="black",face='bold',
                                                 angle=90, hjust = 1, vjust = 0.5),
                      axis.title = element_text(size=12,color="black",face='bold'),
                      legend.text = element_text(size=10,color="black",face='bold'))
