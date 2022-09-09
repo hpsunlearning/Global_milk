@@ -124,9 +124,6 @@ res <- res %>% left_join(taxa %>% dplyr::select(id, Phylum), by = "id") %>%
 
 temp <- res %>% dplyr::select(Taxa, RA) %>% group_by(Taxa) %>% dplyr::summarise(RA = mean(RA)) %>% arrange(desc(RA)) %>% filter(Taxa != "Other")
 
-
-col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
-               brewer.pal(8, "Set2"), brewer.pal(7, "Accent"))
 phylum_color = c(col_vector[1:(nrow(temp))],"Gray50")
 names(phylum_color) = c(temp$Taxa, "Other")
 
@@ -170,8 +167,6 @@ ggsave(filename = paste0(temp_out,"top_phylum_pie.pdf"), device = cairo_pdf,
 
 ### taxa by country bar
 ```{r}
-col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
-               brewer.pal(8, "Set2"), brewer.pal(7, "Accent"))
 
 for (taxrank in c("Species","Genus", "Family", "Phylum")){
   if(taxrank == "Species"){
@@ -299,6 +294,16 @@ for (taxrank in c("ASV", "Species","Genus", "Family", "Phylum")){
   universal_id <- Reduce(intersect, asv_lst)
   dat <- dat %>% mutate(Universal = ifelse(id %in% universal_id, "Y", "N"))
   write.csv(dat, file = paste0(temp_out,"Prevalence_", taxrank, "_in_global.csv"), row.names = F, quote = F)
+  ft2_lst <- split(as.data.frame(ft2), meta_global$Country)
+  res <- lapply(seq_along(ft2_lst), function(n){
+    a <- ft2_lst[[n]]
+    Country <- names(ft2_lst)[n]
+    temp_pre <- colSums(a) /ncol(a) * 100 
+    temp_dat <- data.frame(id = names(temp_pre), prevalence = temp_pre, abundance = colMeans(a)/(rowSums(a)[1]))
+    temp_dat %>% top_n(n = 10, wt = prevalence) %>% mutate(Country = Country)
+  })
+  res_all <- do.call(rbind, res)
+  write.csv(res_all, file = paste0(temp_out,"Prevalence_", taxrank, "_in_global_by_Country.csv"), row.names = F, quote = F)
 }
 
 ```
@@ -325,7 +330,8 @@ for (taxrank in c("ASV", "Species","Genus", "Family")){
     ft <- otu_table(phylo_global_f@otu_table) %>% as.data.frame()
     taxa_temp <- taxa %>% mutate(taxa_long = str_c(Order,Family, sep = ";"))
   }
-  
+  select_top_pre <- read.csv(paste0(temp_out,"Prevalence_", taxrank, "_in_global_by_Country.csv"))
+  top_pre_id <- select_top_pre$id %>% unique()
   dat <- read_csv(paste0(temp_out,"Prevalence_", taxrank, "_in_global.csv"))
   select_id <- dat %>% filter(prevalence>prev | abundance > ra) %>% pull(id)
   ft <- ft[rowSums(ft)>0, ]
@@ -407,7 +413,61 @@ for (taxrank in c("ASV", "Species","Genus", "Family")){
       width = ComplexHeatmap:::width(p) %>% as.numeric()/25.4, 
       height = ComplexHeatmap:::height(p) %>% as.numeric()/25.4, useDingbats = F)
   draw(p)
-  dev.off()   
+  dev.off()
+  
+  wft <- ft[top_pre_id, meta_global %>% pull(SampleID)]
+  if (nrow(wft)>50){
+    wft <- wft[(rowSums(wft) %>% sort(.,decreasing = T))[1:50] %>% names(),]
+  }
+  wft <- log10((wft + 0.5)/colSums(ft)[1])
+  wft <- wft %>% rownames_to_column(var="id") %>% 
+    left_join(taxa_temp %>% dplyr::select(id, taxa_long), by = "id") %>% 
+    dplyr::select(-id) %>% dplyr::select(taxa_long, everything())
+  wft2 = wft %>% column_to_rownames(var = "taxa_long")
+  df_row_name_label = structure(rownames(wft2), names = rownames(wft2))
+  row_dend = as.dendrogram(hclust(dist(wft2)))
+  
+  p3 = Heatmap(as.matrix(wft2), 
+              col = mat_col_fun, 
+              #name = "Relative Abundance",
+              show_heatmap_legend = F,
+              cluster_columns = F, show_column_names = F,
+              #column_split = df_col$SamplingAge_group,
+              cluster_rows = row_dend,
+              row_names_gp = gpar(fontsize = 14),
+              row_labels = df_row_name_label,
+              row_dend_width = unit(15, "mm"),
+              row_names_max_width = max_text_width(df_row_name_label, gp = gpar(fontsize = 14)),
+              top_annotation = column_ha,
+              height = unit(8, "mm")*dim(wft)[1],
+              width = unit(0.4, "mm")*dim(wft)[2]
+              )  
+  p = draw(p3, annotation_legend_side = "left", annotation_legend_list = pd)
+  pdf(file = paste0(temp_out,"heatmap_top_pre_by_country_", taxrank, "_supervised.pdf"), 
+      width = ComplexHeatmap:::width(p) %>% as.numeric()/25.4, 
+      height = ComplexHeatmap:::height(p) %>% as.numeric()/25.4, useDingbats = F)
+  draw(p)
+  dev.off()    
+  
+  p4 = Heatmap(as.matrix(wft2), 
+              col = mat_col_fun, 
+              show_heatmap_legend = F,
+              cluster_columns = T, show_column_names = F,
+              cluster_rows = row_dend,
+              row_names_gp = gpar(fontsize = 14),
+              row_labels = df_row_name_label,
+              row_dend_width = unit(15, "mm"),
+              row_names_max_width = max_text_width(df_row_name_label, gp = gpar(fontsize = 14)),
+              top_annotation = column_ha,
+              height = unit(8, "mm")*dim(wft)[1],
+              width = unit(0.4, "mm")*dim(wft)[2]
+              )  
+  p = draw(p4, annotation_legend_side = "left", annotation_legend_list = pd)
+  pdf(file = paste0(temp_out,"heatmap_top_pre_by_country_", taxrank, "_unsupervised.pdf"), 
+      width = ComplexHeatmap:::width(p) %>% as.numeric()/25.4, 
+      height = ComplexHeatmap:::height(p) %>% as.numeric()/25.4, useDingbats = F)
+  draw(p)
+  dev.off()  
 }
 
 ```

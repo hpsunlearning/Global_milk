@@ -38,11 +38,11 @@ names(col_vector) = col_vector
 #rm(g)
 
 Continent_color <- c("AFRICA"="#7fc97f", "AMERICA"="#beaed4", "EUROPE"="#fdc086")
-Country_color <- c("Guinea Ecuatorial"="#B2DF8A","Kenya"="#33A02C","Senegal"="#A6D854","South Sudan"="#7FC97F","Tanzania"="#66C2A5",
+Country_color <- c("Equatorial Guinea"="#B2DF8A","Kenya"="#33A02C","Senegal"="#A6D854","South Sudan"="#7FC97F","Tanzania"="#66C2A5",
                    "Ecuador"="#CAB2D6","ElSalvador"="#6A3D9A","Mexico"="#BC80BD","Peru"="#8DA0CB","Puerto Rico"="#A6CEE3","United States"="#FB9A99",
                    "Austria"="#E5C494","Germany"="#BF5B17","Netherlands"="#FF7F00","Norway"="#FB8072", "Spain"="#FDB462") 
 
-Country_font_color = c("Guinea Ecuatorial"="#1b9e77", "Kenya"="#1b9e77", "Senegal"="#1b9e77", "South Sudan"="#1b9e77", "Tanzania"="#1b9e77",
+Country_font_color = c("Equatorial Guinea"="#1b9e77", "Kenya"="#1b9e77", "Senegal"="#1b9e77", "South Sudan"="#1b9e77", "Tanzania"="#1b9e77",
                        "Ecuador"="#7570b3", "ElSalvador"="#7570b3", "Mexico"="#7570b3", "Peru"="#7570b3", "Puerto Rico"="#7570b3", "United States"="#7570b3",
                        "Austria"="#d95f02", "Germany"="#d95f02", "Netherlands"="#d95f02", "Norway"="#d95f02", "Spain"="#d95f02")
 Country_labels = glue("<span style='color:{Country_font_color}'>{names(Country_font_color)}</span>")
@@ -169,6 +169,9 @@ meta_all <- meta_all %>% mutate(Conti_grp = case_when(Continent == "AFRICA" ~ "A
 temp <- read_excel("~/Dropbox/Rutgers/20220304_Milk_inventory/ITS_upside_removed/Metadata_global_milk_platemap.xlsx", sheet = "Global_milk_sample_mapping")
 meta_all <- meta_all %>% mutate(ITS = ifelse(SampleID %in% temp$TubeID, "Y", "N"))
 rm(temp)
+#4 corrections
+meta_all <- meta_all %>% mutate(Country = str_replace(Country, "Guinea Ecuatorial", "Equatorial Guinea"))
+
 # replace samdata in phyloseq
 sample_data(phylo_all) <- sample_data(meta_all %>% column_to_rownames(var = "SampleID"))
 ```
