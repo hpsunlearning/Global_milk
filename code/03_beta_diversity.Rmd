@@ -445,5 +445,48 @@ for(dd in c("uu","wu","bray","jaccard")){
 
 ```
 
+## PCoA combine in global
+```{r}
+dat_alpha <- left_join(alpha_boot, meta_all, by = "SampleID")
+alpha <- rbind(dat_alpha %>% filter(!is.na(Country), Project %in% c("Global", "Upside", "Milkbank")),
+               dat_alpha %>% filter(!is.na(Country), Project=="PR") %>% filter(TimePoint == 1200))
+#hist(alpha$Faith_PD)
+alpha_cutoff <- 10
+meta<- alpha %>% mutate(alpha_grp1 = ifelse(Faith_PD > alpha_cutoff, ">10", "<=10"),
+                          alpha_grp2 = ntile(Faith_PD, 3)) %>% 
+  mutate(alpha_grp2 = case_when(alpha_grp2 == 1 ~ "Low",
+                                alpha_grp2 == 2 ~ "Medium",
+                                alpha_grp2 == 3 ~ "High"))
+
+for(dd in c("uu","wu","bray","jaccard")){
+  wdist <- get(paste0("DM_",dd))
+  wmeta = meta %>% filter(SampleID %in% labels(wdist))
+  wdist <- dist_subset(wdist, wmeta$SampleID) 
+  wrda <- dbrda(wdist ~ 1, sqrt.dist = TRUE)
+  wrda_eig <- eigenvals(wrda)
+  varPC1 <- round(wrda_eig["MDS1"]/sum(wrda_eig)*100,2)
+  varPC2 <- round(wrda_eig["MDS2"]/sum(wrda_eig)*100,2)
+  wdat_pcoa <- merge(scores(wrda, display = "sites", choices = c(1,2)),
+                    wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
+    rename(PC1 = MDS1, PC2 = MDS2)
+  
+
+  
+  
+}
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
 
 
