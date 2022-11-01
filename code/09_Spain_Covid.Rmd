@@ -22,7 +22,8 @@ library(ape)
 library(rlist)
 library(ggrepel)
 library(tidyverse)
-temp_out = "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/COVID/"
+temp_out <-  "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/COVID/"
+covid_color <- c("N" = "#91CF60" , "Y" = "#FC8D59")
 ```
 
 ## alpha
@@ -170,12 +171,15 @@ for(dd in c("uu","wu","bray","jaccard")){
 ## taxa ancom
 ### data
 ```{r}
+load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
 meta <- meta_all %>% filter(Project == "Covid Spain") %>% 
   mutate(Covid = ifelse(is.na(Covid_state_mom), "N","Y"))
 
 phylo_covid <- prune_samples(meta$SampleID, phylo_decontam_clean_rf)
 new_sam_data <- sample_data(meta %>% column_to_rownames(var = "SampleID"))
 sample_data(phylo_covid) <- new_sam_data
+
+phylo_s <- tax_glom(phylo_covid, taxrank = "Species", NArm = T)
 
 ```
 
@@ -186,7 +190,7 @@ library(ANCOMBC)
 library(mia)
 
 
-phylo_s <- tax_glom(phylo_covid, taxrank = "Species", NArm = T)
+
 taxa_tmp <- tax_table(phylo_s@tax_table) %>% as.matrix() %>% as.data.frame() %>% 
   rownames_to_column(var = "id") %>% 
   mutate(Species = str_c(Species,";",id)) %>% 
@@ -287,6 +291,29 @@ res <- summarise_maaslin2(path = paste0(output,"All"), group = "all", taxa %>% d
 
 ```
 
+### lesfe
+```{r}
+ft <- otu_table(phylo_s@otu_table) %>% as.data.frame()
+ft <- ft[rowSums(ft)>0,]
+ft <- ft %>% rownames_to_column(var = "id")
+
+taxa_tmp <- tax_table(phylo_covid@tax_table) %>% as.matrix() %>% as.data.frame() %>% 
+  rownames_to_column(var = "id") %>%  replace(is.na(.), "unknown") %>% 
+  mutate(Kingdom = str_remove(Kingdom, "^d__")) %>% 
+  mutate(taxa_long =str_c(Kingdom, Phylum, Class, Order, Family, Genus, Species, sep = "|"))
+
+ft <-  ft %>% left_join(taxa_tmp %>% dplyr::select(id, taxa_long), by = "id") %>% 
+  mutate(id = taxa_long) %>% select(-taxa_long) 
+
+a <- meta %>% dplyr::select(SampleID, Covid) %>% t()
+
+write.table(a, file = paste0(temp_out,"lefse_meta.txt"),
+            append = F, sep = "\t", quote = F, row.names = F )
+
+write.table(ft, file = paste0(temp_out,"lefse_otu.txt"),
+            append = F, sep = "\t", quote = F, row.names = F )
+
+```
 
 
 
