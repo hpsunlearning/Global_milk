@@ -17,65 +17,30 @@ library(ggpubr)
 library(effectsize)
 library(ggtext)
 library(glue)
+library(usedist)
+library(ape)
+library(rlist)
+library(ggrepel)
 library(tidyverse)
+temp_out = "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/COVID/"
 ```
 
-## load data
+## alpha
+### load data
 ```{r}
 load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
 load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
-temp_out = "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/COVID/"
+
 dat_alpha <- left_join(alpha_boot, meta_all, by = "SampleID")
 ```
 
-## function
-```{r}
-comp_kw_aov = function(wdat, x, y){
-  #input data, respond variable y, categorize variable x
-  require(agricolae)
-  ktest1 = kruskal(wdat[y], wdat[x], alpha = 0.05, p.adj="none", group=T, main = "wdat", console=FALSE)
-  out_g_1 = ktest1$groups %>% rownames_to_column(var = "Var") %>% dplyr::select(Var, groups) %>% rename(KW_group = groups)
-  ktest2 = kruskal(wdat[y], wdat[x], alpha = 0.05, p.adj="none", group=F, main = "wdat", console=FALSE)
-  out_c_1 = ktest2$comparison %>% rownames_to_column(var = "comp") %>% dplyr::select(comp, pvalue) %>% rename(KW_pvalue = pvalue)
-  fit = aov(as.formula(paste0(y, "~", x)), wdat)
-  tukey1 = HSD.test(fit, x, group = T)
-  out_g_2 = tukey1$groups %>% rownames_to_column(var = "Var") %>% dplyr::select(Var, groups) %>% rename(aov_group = groups)
-  tukey2 = HSD.test(fit, x, group = F)
-  out_c_2 = tukey2$comparison %>% rownames_to_column(var = "comp") %>% dplyr::select(comp, pvalue) %>% rename(aov_pvalue = pvalue)
-  out_g = merge(out_g_1, out_g_2,by = 1)
-  out_c = merge(out_c_1, out_c_2,by = 1)
-  res = list(out_g, out_c)
-  names(res) = c("grp","comp")
-  res
-}
- 
-my_summarize = function(x){
-  data.frame(
-             N = n(),
-             Min = min(x,na.rm = T),
-             Q5 = quantile(x, probs = 0.05, na.rm = T),
-             Q10 = quantile(x, probs = 0.1, na.rm = T),
-             Q25 = quantile(x, probs = 0.25, na.rm = T),
-             Med = median(x, na.rm = T),
-             Mean = mean(x, na.rm = T),
-             Q75 = quantile(x, probs = 0.75, na.rm = T),
-             Q95 = quantile(x, probs = 0.95, na.rm = T),
-             Max = max(x,na.rm = T)
-             )
-}
-
-covid_color = c("N"="#91cf60", "Y"="#fc8d59")
-```
-
-
-## alpha by covid
+### alpha by covid
 ```{r}
 dat <- dat_alpha %>% filter(Project == "Covid Spain") %>% 
   mutate(Covid = ifelse(is.na(Covid_state_mom), "N","Y")) %>% 
  dplyr::select(SampleID, Covid,Faith_PD:Pielou_evenness) %>% 
   pivot_longer(Faith_PD:Pielou_evenness, names_to = "Metrics", values_to = "value")
   
-
 
 g <- ggplot(dat, aes(Covid, value)) + 
   geom_boxplot(aes(color = Covid), outlier.alpha = 0) + 
@@ -102,7 +67,8 @@ ggsave(filename = paste0(temp_out, "alpha_by_covid.pdf"), device = cairo_pdf,
 
 ```
 
-## beta by covid
+## beta 
+### load data
 ```{r}
 load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_uu.RData")
 load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_wu.RData")
@@ -122,17 +88,10 @@ calcOmega2_dm <- function(x) {
     return(out)
 }
 
-library(usedist)
-library(purrr)
-library(furrr)
-library(vegan)
-library(ape)
-library(rlist)
-library(ggpubr)
-library(ggtext)
-library(ggrepel)
+```
 
-
+### PCoa
+```{r}
 meta <- phylo_decontam_clean_rf@sam_data@.Data %>% as.data.frame()
 names(meta) <- phylo_decontam_clean_rf@sam_data@names
 meta$SampleID <- phylo_decontam_clean_rf@sam_data@row.names
@@ -205,12 +164,128 @@ for(dd in c("uu","wu","bray","jaccard")){
   ggsave(filename = paste0(temp_out,"PCoA_",dd,"_Covid_center.pdf"), device = cairo_pdf, 
            plot = g, width = 7, height = 5, units = "in", dpi = 300)  
 }
+```
 
 
+## taxa ancom
+### data
+```{r}
+meta <- meta_all %>% filter(Project == "Covid Spain") %>% 
+  mutate(Covid = ifelse(is.na(Covid_state_mom), "N","Y"))
 
+phylo_covid <- prune_samples(meta$SampleID, phylo_decontam_clean_rf)
+new_sam_data <- sample_data(meta %>% column_to_rownames(var = "SampleID"))
+sample_data(phylo_covid) <- new_sam_data
 
 ```
 
+
+### ancom
+```{r}
+library(ANCOMBC)
+library(mia)
+
+
+phylo_s <- tax_glom(phylo_covid, taxrank = "Species", NArm = T)
+taxa_tmp <- tax_table(phylo_s@tax_table) %>% as.matrix() %>% as.data.frame() %>% 
+  rownames_to_column(var = "id") %>% 
+  mutate(Species = str_c(Species,";",id)) %>% 
+  column_to_rownames(var = "id") %>% as.matrix()
+taxa_tmp <- tax_table(taxa_tmp)
+
+tax_table(phylo_s) <- taxa_tmp
+out <- ancombc2(data = phylo_s, fix_formula = "Covid", tax_level = "Species")
+  
+taxa_tmp <- tax_table(phylo_covid@tax_table) %>% as.matrix() %>% as.data.frame() %>% 
+  rownames_to_column(var = "id") %>% 
+  mutate(Species = id) %>% 
+  column_to_rownames(var = "id") %>% as.matrix()
+taxa_tmp <- tax_table(taxa_tmp)
+tax_table(phylo_covid) <- taxa_tmp
+
+out_asv <- ancombc2(data = phylo_covid, fix_formula = "Covid", tax_level = "Species")  
+  
+
+
+```
+### maaslin2
+```{r}
+library(Maaslin2)
+do_maaslin2 <- function(meta, sample_id, phylo_rf, fixed, random, ref, output, 
+                       min_prevalence = 0.1, min_abundance = 0.0, max_significance = 0.1,
+                       normalization = "TSS", transform = "LOG",analysis_method = "LM",
+                       plot_heatmap	= FALSE, plot_scatter = FALSE, cores = 1){
+  ft <- otu_table(phylo_rf@otu_table) %>% as.matrix() %>% as.data.frame() %>% rownames_to_column(var = "id")
+  wft <- ft %>% dplyr::select(id,  meta %>% pull(sample_id)) %>% column_to_rownames(var = "id") %>% t()
+  wmeta <- meta %>% column_to_rownames(var = sample_id)
+  taxrank <- "ASV"
+  fit <- Maaslin2(
+    input_data = wft, 
+    input_metadata = wmeta, 
+    normalization = normalization,
+    transform = transform,
+    analysis_method = analysis_method,
+    output = paste0(output,"_",taxrank),
+    fixed_effects = fixed,
+    reference = ref,
+    random_effects = random,
+    min_prevalence = min_prevalence,
+    min_abundance = min_abundance,
+    max_significance = max_significance,
+    plot_heatmap = plot_heatmap,
+    plot_scatter = plot_scatter,
+    cores = cores
+  )
+  for (taxrank in c("Species","Genus","Family","Order","Class","Phylum")){
+  phylo_glom <- tax_glom(phylo_rf, taxrank = taxrank, NArm = F)
+  ft_glom <- otu_table(phylo_glom@otu_table) %>% as.matrix() %>% as.data.frame() %>% rownames_to_column(var = "id")
+  wft <- ft_glom %>% dplyr::select(id, meta %>% pull(sample_id)) %>% column_to_rownames(var = "id") %>% t()
+  fit <- Maaslin2(
+      input_data = wft, 
+      input_metadata = wmeta, 
+      normalization = normalization,
+      transform = transform,
+      analysis_method = analysis_method,
+      output = paste0(output,"_",taxrank),
+      fixed_effects = fixed,
+      reference = ref,
+      random_effects = random,
+      min_prevalence = min_prevalence,
+      min_abundance = min_abundance,
+      max_significance = max_significance,
+      plot_heatmap = plot_heatmap,
+      plot_scatter = plot_scatter,
+      cores = cores
+      )
+  }
+}
+summarise_maaslin2 <- function(path, group, taxa){
+  res <- matrix(data = NA, nrow = 1, ncol = 20)
+  res <- as.data.frame(res)
+  names(res) <-  c("feature","metadata","value","coef","stderr","N","N.not.0","pval","qval","Group",
+                  "id","Kingdom","Phylum","Class","Order","Family","Genus","Species","ASV", "level")
+  for (taxrank in c("ASV", "Species", "Genus", "Family", "Order", "Class", "Phylum")){
+    a <- read.table(file = paste0(path ,"_", taxrank, "/significant_results.tsv"),
+                  header = T, sep = "\t", stringsAsFactors = F)
+    if (nrow(a) == 0) {next}
+    a <- a %>% mutate(Group = group, id = str_remove(feature,"^X"),feature = str_remove(feature,"^X")) %>% left_join(taxa, by = "id") %>% mutate(level = taxrank)
+    res <- rbind(res,a)
+  }
+  res <- res %>% filter(!is.na(feature))
+  res
+}
+output <- paste0(temp_out, "maaslin2/")
+fit <- do_maaslin2(meta = meta, sample_id = "SampleID", phylo_rf = phylo_covid, 
+                  fixed = c("Covid"), 
+                  random = NULL, 
+                  ref = c("N"), 
+                  output = paste0(output,"All"),
+                  cores = 4
+                  )
+res <- summarise_maaslin2(path = paste0(output,"All"), group = "all", taxa %>% dplyr::select(-taxa_long))
+
+
+```
 
 
 
