@@ -1,0 +1,136 @@
+---
+title: "Taxa"
+author: "Haipeng Sun"
+date: "8/5/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## library
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(phyloseq)
+library(Hmisc)
+library(agricolae)
+library(grid)
+library(gridExtra)
+library(gtable)
+library(ggrepel)
+library(phyloseq)
+library(usedist)
+library(purrr)
+library(furrr)
+library(rlist)
+library(ggpubr)
+library(ggtext)
+library(glue)
+library(gplots)
+library(ggpattern)
+library(UpSetR)
+library(RColorBrewer)
+library(randomcoloR)
+library(patchwork)
+library(ComplexHeatmap)
+library(tidyverse)
+```
+
+## load data
+```{r}
+load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
+load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_global.Rdata")
+temp_out = "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/species_tree/"
+```
+
+
+## species prevalence 
+```{r}
+ft <- otu_table(phylo_global_s@otu_table) %>% as.data.frame() %>% t()
+ft <- ft[meta_global$SampleID,]
+ft <- ft[, colSums(ft)>0]
+
+pre_s_individual <- data.frame(id = colnames(ft),
+                               pre_individual = colSums(ft>0)/nrow(ft))
+
+asv_sum_country <- aggregate(ft, by = list(meta_global$Country), sum)
+pre_s_country <- data.frame(id = colnames(asv_sum_country[,-1]),
+                            pre_country = colSums(asv_sum_country[,-1]>0)/nrow(asv_sum_country)) %>% 
+  left_join(taxa, by = "id")
+
+pre_s <- pre_s_country %>% left_join(pre_s_individual, by = "id") %>% 
+  dplyr::select(id,pre_country, pre_individual, everything())
+
+rm(ft, asv_sum_country, pre_s_individual, pre_s_country)
+```
+
+## tree 
+```{r}
+library(treeio)
+library(castor)
+library(ape)
+library(ggtree)
+all_tree <- phy_tree(phylo_global)
+```
+
+### one tree for 315ca0a729f126b941ba111a16d4d97a
+```{r}
+asv_in_s <- taxa %>% left_join(pre_s %>% filter(id == "315ca0a729f126b941ba111a16d4d97a") %>% 
+                     dplyr::select(pre_country, pre_individual,Family,Genus, Species ), 
+                   by = c("Family"="Family", "Genus"="Genus", "Species"="Species")) %>% 
+  filter(!is.na(pre_country))
+
+ft_asv <- otu_table(phylo_global@otu_table) %>% as.data.frame() %>% t()
+ft_asv <- ft_asv[meta_global$SampleID,]
+ft_asv <- ft_asv[, colSums(ft_asv)>0]
+
+asv_picked <- intersect(asv_in_s$id, colnames(ft_asv))
+ft_asv <- ft_asv[, asv_picked]
+
+asv_sum_country <- aggregate(ft_asv, by = list(meta_global$Country), sum)
+
+asv_status <- lapply(2:ncol(asv_sum_country), function(x){
+  temp <- asv_sum_country[,x]
+  if (sum(temp>1)==1){
+    res <- data.frame(id = colnames(asv_sum_country)[x], 
+                      status = asv_sum_country$Group.1[which(temp >0)])
+  }else{
+    res <- data.frame(id = colnames(asv_sum_country)[x], 
+                      status = "Shared")
+  }
+}) %>% do.call(rbind,.)
+
+## subset tree
+subtree <- get_subtree_with_tips(all_tree, only_tips=asv_status$id)$subtree
+tidy_tree <- as_tibble(subtree) 
+tidy_tree <- tidy_tree %>% left_join(asv_status, by = c("label" = "id"))
+
+g1 <- tidy_tree %>% as.treedata() %>% 
+  ggtree(aes(color = status), branch.length = 'none', layout='circular') +
+  scale_color_manual(values = c(Country_color, Shared = "black")) 
+
+
+## extract seq
+rep_seq <- read.FASTA(paste0(path_rec,"05_merged/sequences.fasta"), type = "DNA")
+asv_seq <- rep_seq[names(rep_seq) %in% asv_status$id]
+write.dna(asv_seq, file = paste0(temp_out,"test.fasta"), format = "fasta")
+#### align online with clustalw https://www.ebi.ac.uk/Tools/msa/clustalo/
+a <- read.newick(file = paste0(temp_out,"test.tree"))
+tidy_tree <- as_tibble(a) 
+tidy_tree <- tidy_tree %>% left_join(asv_status, by = c("label" = "id"))
+
+g2 <- tidy_tree %>% as.treedata() %>% 
+  ggtree(aes(color = status), branch.length = 'none', layout='circular') +
+  scale_color_manual(values = c(Country_color, Shared = "black")) 
+
+
+```
+
+
+
+
+
+
+
+
+
