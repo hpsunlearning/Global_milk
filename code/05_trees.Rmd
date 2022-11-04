@@ -114,6 +114,11 @@ g1 <- tidy_tree %>% as.treedata() %>%
 rep_seq <- read.FASTA(paste0(path_rec,"05_merged/sequences.fasta"), type = "DNA")
 asv_seq <- rep_seq[names(rep_seq) %in% asv_status$id]
 write.dna(asv_seq, file = paste0(temp_out,"test.fasta"), format = "fasta")
+
+
+
+
+
 #### align online with clustalw https://www.ebi.ac.uk/Tools/msa/clustalo/
 a <- read.newick(file = paste0(temp_out,"test.tree"))
 tidy_tree <- as_tibble(a) 
