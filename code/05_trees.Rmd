@@ -127,6 +127,21 @@ g2 <- tidy_tree %>% as.treedata() %>%
 ```
 
 
+```{r}
+library(msa)
+readBStringSet(filepath, format="fasta",
+               nrec=-1L, skip=0L, seek.first.rec=FALSE, use.names=TRUE)
+readDNAStringSet(filepath, format="fasta",
+               nrec=-1L, skip=0L, seek.first.rec=FALSE, use.names=TRUE)
+
+
+myClustalWAlignment <- msa(mySequences, "ClustalW")
+
+
+
+
+
+```
 
 
 
