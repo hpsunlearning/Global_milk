@@ -44,19 +44,19 @@ temp_out = "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/taxa/"
 
 ## Global samples
 ```{r eval=FALSE, include=TRUE}
-meta_global <- phylo_decontam_clean_rf@sam_data@.Data %>% as.data.frame()
-names(meta_global) <- phylo_decontam_clean_rf@sam_data@names
-meta_global$SampleID <- phylo_decontam_clean_rf@sam_data@row.names
-meta_global <- rbind(meta_global %>% filter(!is.na(Country), Project %in% c("Global", "Upside", "Milkbank")),
-                     #meta_global %>% filter(!is.na(Country), Project  %in% c("Covid Mom", "Family", "PR")) %>%
-                     meta_global %>% filter(!is.na(Country), Project=="PR") %>%
-               filter(TimePoint == 1200))
-
-phylo_global <- prune_samples(meta_global$SampleID, phylo_decontam_clean_rf)
-phylo_global_s <- tax_glom(phylo_global, taxrank = "Species", NArm=FALSE)
-phylo_global_g <- tax_glom(phylo_global, taxrank = "Genus", NArm=FALSE)
-phylo_global_f <- tax_glom(phylo_global, taxrank = "Family", NArm=FALSE)
-phylo_global_p <- tax_glom(phylo_global, taxrank = "Phylum", NArm=FALSE)
+# meta_global <- phylo_decontam_clean_rf@sam_data@.Data %>% as.data.frame()
+# names(meta_global) <- phylo_decontam_clean_rf@sam_data@names
+# meta_global$SampleID <- phylo_decontam_clean_rf@sam_data@row.names
+# meta_global <- rbind(meta_global %>% filter(!is.na(Country), Project %in% c("Global", "Upside", "Milkbank")),
+#                      #meta_global %>% filter(!is.na(Country), Project  %in% c("Covid Mom", "Family", "PR")) %>%
+#                      meta_global %>% filter(!is.na(Country), Project=="PR") %>%
+#                filter(TimePoint == 1200))
+# 
+# phylo_global <- prune_samples(meta_global$SampleID, phylo_decontam_clean_rf)
+# phylo_global_s <- tax_glom(phylo_global, taxrank = "Species", NArm=FALSE)
+# phylo_global_g <- tax_glom(phylo_global, taxrank = "Genus", NArm=FALSE)
+# phylo_global_f <- tax_glom(phylo_global, taxrank = "Family", NArm=FALSE)
+# phylo_global_p <- tax_glom(phylo_global, taxrank = "Phylum", NArm=FALSE)
 
 #save(meta_global, phylo_global, phylo_global_s, phylo_global_g, phylo_global_f,phylo_global_p,
 #     file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_global.Rdata")
@@ -83,7 +83,7 @@ for (taxrank in c("ASV","Species","Genus", "Family")){
     names(dat)[(which(dat[1,] > 1))]
   })
   g <- upset(fromList(asv_lst), 
-           sets = c("Guinea Ecuatorial", "Kenya", "Senegal", "South Sudan", "Tanzania",
+           sets = c("Equatorial Guinea", "Kenya", "Senegal", "South Sudan", "Tanzania",
                     "Ecuador", "ElSalvador", "Mexico", "Peru", "Puerto Rico", "United States",
                     "Austria", "Germany", "Netherlands", "Norway", "Spain"),
            order.by = "freq", keep.order = TRUE,
@@ -157,7 +157,7 @@ names(g_lst) <- res$Country %>% unique()
 #  g_lst$Austria + g_lst$Germany + g_lst$Netherlands + g_lst$Norway + g_lst$Spain + guide_area() + 
 #  plot_layout(design = layout, guides = "collect")
 
-g <- g_lst$`Guinea Ecuatorial` + g_lst$Kenya + g_lst$Senegal + g_lst$`South Sudan` + g_lst$Tanzania +
+g <- g_lst$`Equatorial Guinea` + g_lst$Kenya + g_lst$Senegal + g_lst$`South Sudan` + g_lst$Tanzania +
   g_lst$Ecuador + g_lst$ElSalvador + g_lst$Mexico + g_lst$Peru + g_lst$`Puerto Rico` + g_lst$`United States` + 
   g_lst$Austria + g_lst$Germany + g_lst$Netherlands + g_lst$Norway + g_lst$Spain + 
   plot_layout(ncol = 4, guides = "collect")

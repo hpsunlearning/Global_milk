@@ -246,6 +246,33 @@ sample_depth <- cbind(sample_sums(phylo_all), sample_sums(phylo_decontam),sample
             original, decontamed, decontam_cleaned) %>% 
   arrange(decontam_cleaned)
 sample_depth %>% head(n = 50)
+
+write.csv(sample_depth, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/sample_clean_depth.csv", quote = F, row.names = F)
+
+my_summarize = function(x){
+  data.frame(
+             #N = n(),
+             Min = min(x,na.rm = T),
+             Q5 = quantile(x, probs = 0.05, na.rm = T),
+             Q10 = quantile(x, probs = 0.1, na.rm = T),
+             Q25 = quantile(x, probs = 0.25, na.rm = T),
+             Med = median(x, na.rm = T),
+             Mean = mean(x, na.rm = T),
+             Q75 = quantile(x, probs = 0.75, na.rm = T),
+             Q95 = quantile(x, probs = 0.95, na.rm = T),
+             Max = max(x,na.rm = T)
+             )
+}
+
+a <- lapply(c("original", "decontamed", "decontam_cleaned"), function(x){
+  temp <- my_summarize(sample_depth %>% pull(x))
+  temp
+}) %>% do.call(rbind, .)
+rownames(a) <- c("original", "decontamed", "decontam_cleaned")
+
+write.csv(a, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/sample_clean_depth_summary.csv", quote = F, row.names = T)
+
+
 ```
 
 ### rarefy depth
