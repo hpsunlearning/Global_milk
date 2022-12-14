@@ -99,6 +99,48 @@ for (taxrank in c("ASV","Species","Genus", "Family")){
 
 ```
 
+##
+```{r}
+ft <- otu_table(phylo_global_s@otu_table) %>% as.data.frame() %>% t()
+top_10 <-  (colSums(ft) %>% sort(decreasing = T) %>% names())[1:10]
+
+
+
+
+
+dat <- ft[,top_10] %>% as.data.frame() %>% rownames_to_column(var = "SampleID") %>% 
+  pivot_longer(-SampleID, names_to = "ASV", values_to = "Count") %>% 
+  mutate(RA = Count / rowSums(ft)[1], 
+         log_Count = log10(Count + 1),
+         sqrt_Count = sqrt(Count),
+         ast_RA = asin(sqrt(RA)),
+         sqrt_RA = sqrt(RA))
+
+
+ggplot(dat, aes(x = Count, color = ASV)) + geom_density() + coord_cartesian(xlim = c(0,500))
+
+ggplot(dat, aes(x = log_Count, color = ASV)) + geom_density()
+
+ggplot(dat, aes(x = sqrt_Count, color = ASV)) + geom_density()
+
+ggplot(dat, aes(x = RA, color = ASV)) + geom_density() + coord_cartesian(xlim = c(0,0.15)) 
+
+ggplot(dat, aes(x = ast_RA, color = ASV)) + geom_density()
+
+ggplot(dat, aes(x = sqrt_RA, color = ASV)) + geom_density()
+
+ft_clr <- compositions::clr(ft)
+
+dat3 <- ft_clr[,top_10] %>% as.data.frame() %>% rownames_to_column(var = "SampleID") %>% 
+  pivot_longer(-SampleID, names_to = "ASV", values_to = "clr")
+
+ggplot(dat3, aes(x = clr, color = ASV)) + geom_density()
+
+
+
+```
+
+
 ## taxa plots
 ### phylums by country pie
 ```{r}
