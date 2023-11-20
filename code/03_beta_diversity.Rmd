@@ -113,6 +113,12 @@ for(dd in c("uu","wu","bray","jaccard")){
   # write.csv(res, 
   #           file = paste0(temp_out,"adonis_test_", dd, "_Global_Continent_group.csv"), quote = F, row.names = F)   
   #PCoA
+  disper <- betadisper(wdist, wmeta$Country)   
+  anova(disper)
+  disper <- betadisper(wdist, wmeta$Continent)   
+  anova(disper)
+  
+  
   wrda <- dbrda(wdist ~ 1, sqrt.dist = TRUE)
   wrda_eig <- eigenvals(wrda)
   varPC1 <- round(wrda_eig["MDS1"]/sum(wrda_eig)*100,2)
@@ -344,6 +350,22 @@ for(dd in c("uu","wu","bray","jaccard")){
            plot = g, width = 7, height = 5, units = "in", dpi = 300)
 }
 ```
+
+##
+```{r}
+for(dd in c("uu","wu","bray","jaccard")){
+  wdist <- get(paste0("DM_",dd))
+  wmeta = meta %>% filter(SampleID %in% labels(wdist))
+  wdist <- dist_subset(wdist, wmeta$SampleID) 
+  print(dd)
+  disper <- betadisper(wdist, wmeta$Country)   
+  anova(disper) %>% print()
+  disper <- betadisper(wdist, wmeta$Continent)   
+  anova(disper) %>% print()
+}
+```
+
+
 
 ## beta diversity by alpha
 ```{r}

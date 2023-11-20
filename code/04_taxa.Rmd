@@ -62,6 +62,40 @@ temp_out = "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/taxa/"
 #     file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_global.Rdata")
 load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_global.Rdata")
 #rm(phylo_all, phylo_decontam, phylo_decontam_clean, phylo_decontam_clean_rf)
+
+comp_kw_aov = function(wdat, x, y){
+  #input data, respond variable y, categorize variable x
+  require(agricolae)
+  ktest1 = kruskal(wdat[y], wdat[x], alpha = 0.05, p.adj="none", group=T, main = "wdat", console=FALSE)
+  out_g_1 = ktest1$groups %>% rownames_to_column(var = "Var") %>% dplyr::select(Var, groups) %>% rename(KW_group = groups)
+  ktest2 = kruskal(wdat[y], wdat[x], alpha = 0.05, p.adj="none", group=F, main = "wdat", console=FALSE)
+  out_c_1 = ktest2$comparison %>% rownames_to_column(var = "comp") %>% dplyr::select(comp, pvalue) %>% rename(KW_pvalue = pvalue)
+  fit = aov(as.formula(paste0(y, "~", x)), wdat)
+  tukey1 = HSD.test(fit, x, group = T)
+  out_g_2 = tukey1$groups %>% rownames_to_column(var = "Var") %>% dplyr::select(Var, groups) %>% rename(aov_group = groups)
+  tukey2 = HSD.test(fit, x, group = F)
+  out_c_2 = tukey2$comparison %>% rownames_to_column(var = "comp") %>% dplyr::select(comp, pvalue) %>% rename(aov_pvalue = pvalue)
+  out_g = merge(out_g_1, out_g_2,by = 1)
+  out_c = merge(out_c_1, out_c_2,by = 1)
+  res = list(out_g, out_c)
+  names(res) = c("grp","comp")
+  res
+}
+ 
+my_summarize = function(x){
+  data.frame(
+             N = n(),
+             Min = min(x,na.rm = T),
+             Q5 = quantile(x, probs = 0.05, na.rm = T),
+             Q10 = quantile(x, probs = 0.1, na.rm = T),
+             Q25 = quantile(x, probs = 0.25, na.rm = T),
+             Med = median(x, na.rm = T),
+             Mean = mean(x, na.rm = T),
+             Q75 = quantile(x, probs = 0.75, na.rm = T),
+             Q95 = quantile(x, probs = 0.95, na.rm = T),
+             Max = max(x,na.rm = T)
+             )
+}
 ```
 
 ## unique ASV/species/genus in different Country (Global Project)
@@ -472,6 +506,118 @@ for (taxrank in c("ASV", "Species","Genus", "Family")){
 
 ```
 
+## bifido
+```{r}
+ft <- otu_table(phylo_global_g@otu_table) %>% as.data.frame() %>% 
+  rownames_to_column(var = "id") %>% 
+  left_join(taxa, by = "id") %>% 
+  filter(Genus == "g_Bifidobacterium") %>% 
+  column_to_rownames(var = "id") %>% t() %>% as.data.frame() %>% 
+  rownames_to_column(var = "SampleID") 
+
+names(ft) <- c("SampleID","Count")
+ft$Count <- as.integer(ft$Count)
+ft$RA <- ft$Count/2857
+
+dat <- ft %>% left_join(meta_global, by = "SampleID") %>% 
+  mutate(Country = factor(Country,
+                          levels = c("Equatorial Guinea", "Kenya", "Senegal", "South Sudan", "Tanzania",
+                                     "Ecuador", "ElSalvador", "Mexico", "Peru", "Puerto Rico", "United States",
+                                     "Austria", "Germany", "Netherlands", "Norway", "Spain"),
+                          ordered = T)) %>% 
+  filter(!is.na(Country))
+
+res <- comp_kw_aov(wdat = dat, x = "Country", y = "RA")
+res_summary <- dat %>% dplyr::select(RA, Country) %>% 
+  group_by(Country) %>% 
+  summarise_all(my_summarize) %>% 
+  ungroup() %>%
+  unnest(cols = RA) %>% 
+  left_join(res$grp, by = c("Country"="Var"))
+
+
+g <- ggplot(dat, aes(Country, RA)) + 
+  geom_boxplot(aes(color = Country, fill = Country),alpha = 0.7,  outlier.alpha = 0) + 
+  geom_point(aes(color = Country), position = position_jitterdodge()) + 
+  geom_text(data = res_summary, 
+            aes(x =  Country, y = 1.08 * Max, label = KW_group)) +
+  scale_color_manual(values = Country_color, aesthetics = c("color","fill")) + 
+  scale_x_discrete(labels=Country_labels) + 
+  labs(x = "", y = "Bifidobacterium Relative abundance") +
+  theme_bw() + theme(#aspect.ratio = 0.8,
+    legend.position="none",
+    panel.background = element_rect(fill = NA),
+    strip.text = element_text(size=12,color="black",face='bold'),
+    axis.title = element_text(size=12,color="black",face='bold'),
+    axis.text = element_text(size=12,color="black",face='bold'),
+    axis.text.x = element_markdown(size=12, face='bold',angle=90,vjust = 0.5, hjust = 1),
+    axis.text.y = element_text(size=12,color="black",face='bold'),
+    legend.text = element_text(size=12,color="black",face='bold'),
+    legend.title = element_text(size=12,color="black",face='bold'),
+    title = element_text(size=12,color="black",face='bold'))
+
+ggsave(filename = paste0(temp_out, "bifido_by_Country_global.pdf"), device = cairo_pdf, 
+         plot = g, width = 14, height = 10, units = "in", dpi = 300) 
+
+## order bifido
+g <- ggplot(dat %>% mutate(Country = factor(Country, levels= res_summary %>% arrange(desc(Med)) %>% pull(Country), ordered = T)), 
+            aes(Country, RA)) + 
+  geom_boxplot(aes(color = Country, fill = Country),alpha = 0.7,  outlier.alpha = 0) + 
+  geom_point(aes(color = Country), position = position_jitterdodge()) + 
+  geom_text(data = res_summary, 
+            aes(x =  Country, y = 1.08 * Max, label = KW_group)) +
+  scale_color_manual(values = Country_color, aesthetics = c("color","fill")) + 
+  scale_x_discrete(labels=Country_labels) + 
+  labs(x = "", y = "Bifidobacterium Relative abundance") +
+  theme_bw() + theme(#aspect.ratio = 0.8,
+    legend.position="none",
+    panel.background = element_rect(fill = NA),
+    strip.text = element_text(size=12,color="black",face='bold'),
+    axis.title = element_text(size=12,color="black",face='bold'),
+    axis.text = element_text(size=12,color="black",face='bold'),
+    axis.text.x = element_markdown(size=12, face='bold',angle=90,vjust = 0.5, hjust = 1),
+    axis.text.y = element_text(size=12,color="black",face='bold'),
+    legend.text = element_text(size=12,color="black",face='bold'),
+    legend.title = element_text(size=12,color="black",face='bold'),
+    title = element_text(size=12,color="black",face='bold'))
+
+ggsave(filename = paste0(temp_out, "bifido_by_Country_global_ordered.pdf"), device = cairo_pdf, 
+         plot = g, width = 14, height = 10, units = "in", dpi = 300) 
+
+
+res <- comp_kw_aov(wdat = dat, x = "Continent", y = "RA")
+res_summary <- dat %>% dplyr::select(RA, Continent) %>% 
+  group_by(Continent) %>% 
+  summarise_all(my_summarize) %>% 
+  ungroup() %>%
+  unnest(cols = RA) %>% 
+  left_join(res$grp, by = c("Continent"="Var"))
+
+g <- ggplot(dat, aes(Continent, RA)) + 
+  geom_boxplot(aes(color = Continent, fill = Continent),alpha = 0.7,  outlier.alpha = 0) + 
+  geom_point(aes(color = Continent), position = position_jitterdodge()) + 
+  geom_text(data = res_summary, 
+            aes(x =  Continent, y = 1.08 * Max, label = KW_group)) +
+  scale_color_manual(values = Continent_color, aesthetics = c("color","fill")) + 
+  #scale_x_discrete(labels=Country_labels) + 
+  labs(x = "", y = "Bifidobacterium Relative abundance") +
+  theme_bw() + theme(#aspect.ratio = 0.8,
+    legend.position="none",
+    panel.background = element_rect(fill = NA),
+    strip.text = element_text(size=12,color="black",face='bold'),
+    axis.title = element_text(size=12,color="black",face='bold'),
+    axis.text = element_text(size=12,color="black",face='bold'),
+    axis.text.x = element_markdown(size=12, face='bold',angle=90,vjust = 0.5, hjust = 1),
+    axis.text.y = element_text(size=12,color="black",face='bold'),
+    legend.text = element_text(size=12,color="black",face='bold'),
+    legend.title = element_text(size=12,color="black",face='bold'),
+    title = element_text(size=12,color="black",face='bold'))
+
+ggsave(filename = paste0(temp_out, "bifidobacterium_by_Continent_global.pdf"), device = cairo_pdf, 
+         plot = g, width = 14, height = 10, units = "in", dpi = 300) 
+
+
+```
 
 
 
