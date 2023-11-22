@@ -27,10 +27,10 @@ library(ggpubr)
 library(ggtext)
 library(glue)
 library(gplots)
-library(ggpattern)
-library(UpSetR)
+#library(ggpattern)
+#library(UpSetR)
 library(RColorBrewer)
-library(randomcoloR)
+#library(randomcoloR)
 library(patchwork)
 library(ComplexHeatmap)
 library(tidyverse)
@@ -533,7 +533,8 @@ res_summary <- dat %>% dplyr::select(RA, Country) %>%
   summarise_all(my_summarize) %>% 
   ungroup() %>%
   unnest(cols = RA) %>% 
-  left_join(res$grp, by = c("Country"="Var"))
+  left_join(res$grp, by = c("Country"="Var")) %>% 
+  mutate(N_lab = str_c("",N))
 
 
 g <- ggplot(dat, aes(Country, RA)) + 
@@ -541,11 +542,13 @@ g <- ggplot(dat, aes(Country, RA)) +
   geom_point(aes(color = Country), position = position_jitterdodge()) + 
   geom_text(data = res_summary, 
             aes(x =  Country, y = 1.08 * Max, label = KW_group)) +
+  geom_text(data = res_summary, 
+            aes(x =  Country, y = -0.01, label = N_lab)) +
   scale_color_manual(values = Country_color, aesthetics = c("color","fill")) + 
   scale_x_discrete(labels=Country_labels) + 
   labs(x = "", y = "Bifidobacterium Relative abundance") +
   theme_bw() + theme(#aspect.ratio = 0.8,
-    legend.position="none",
+    legend.position="left",
     panel.background = element_rect(fill = NA),
     strip.text = element_text(size=12,color="black",face='bold'),
     axis.title = element_text(size=12,color="black",face='bold'),
@@ -557,7 +560,7 @@ g <- ggplot(dat, aes(Country, RA)) +
     title = element_text(size=12,color="black",face='bold'))
 
 ggsave(filename = paste0(temp_out, "bifido_by_Country_global.pdf"), device = cairo_pdf, 
-         plot = g, width = 14, height = 10, units = "in", dpi = 300) 
+         plot = g, width = 7, height = 7, units = "in", dpi = 300) 
 
 ## order bifido
 g <- ggplot(dat %>% mutate(Country = factor(Country, levels= res_summary %>% arrange(desc(Med)) %>% pull(Country), ordered = T)), 
@@ -566,11 +569,13 @@ g <- ggplot(dat %>% mutate(Country = factor(Country, levels= res_summary %>% arr
   geom_point(aes(color = Country), position = position_jitterdodge()) + 
   geom_text(data = res_summary, 
             aes(x =  Country, y = 1.08 * Max, label = KW_group)) +
+  geom_text(data = res_summary, 
+            aes(x =  Country, y = -0.01, label = N_lab)) +
   scale_color_manual(values = Country_color, aesthetics = c("color","fill")) + 
   scale_x_discrete(labels=Country_labels) + 
   labs(x = "", y = "Bifidobacterium Relative abundance") +
   theme_bw() + theme(#aspect.ratio = 0.8,
-    legend.position="none",
+    legend.position="left",
     panel.background = element_rect(fill = NA),
     strip.text = element_text(size=12,color="black",face='bold'),
     axis.title = element_text(size=12,color="black",face='bold'),
@@ -582,7 +587,7 @@ g <- ggplot(dat %>% mutate(Country = factor(Country, levels= res_summary %>% arr
     title = element_text(size=12,color="black",face='bold'))
 
 ggsave(filename = paste0(temp_out, "bifido_by_Country_global_ordered.pdf"), device = cairo_pdf, 
-         plot = g, width = 14, height = 10, units = "in", dpi = 300) 
+       plot = g, width = 7, height = 7, units = "in", dpi = 300) 
 
 
 res <- comp_kw_aov(wdat = dat, x = "Continent", y = "RA")
