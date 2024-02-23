@@ -676,7 +676,86 @@ for(dd in c("uu","wu","bray","jaccard")){
 
 ```
 
+## different way for PcoA
+```{r}
+dd = "bray"
+wdist <- get(paste0("DM_",dd))
+wmeta = meta_all %>% filter(SampleID %in% labels(wdist), !is.na(Country))
+wdist <- dist_subset(wdist, wmeta$SampleID)  
 
+## dbRDA
+wrda <- dbrda(wdist ~ 1, sqrt.dist = TRUE)
+wrda_eig <- eigenvals(wrda)
+varPC1_1 <- round(wrda_eig["MDS1"]/sum(wrda_eig)*100,2)
+varPC2_1 <- round(wrda_eig["MDS2"]/sum(wrda_eig)*100,2)
+x_lab_1 <- paste0("PC1 (", varPC1_1, "%)")
+y_lab_1 <- paste0("PC2 (", varPC2_1, "%)")
+wdat_wrda <- merge(scores(wrda, display = "sites", choices = c(1,2)),
+                   wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
+  rename(PC1 = MDS1, PC2 = MDS2)
+wrda_fit <- envfit(wrda ~ Country, data = wmeta)
+wdat_center_1 <- wrda_fit$factors$centroids %>% as.data.frame() %>% 
+  rownames_to_column(var = "Country") %>%
+  transmute(Country = str_remove(Country,"Country"),PC1 = MDS1, PC2 = MDS2) %>%
+  left_join(wmeta %>% dplyr::select(Country, Continent) %>% unique(),by = "Country")
+wdat_1 <- wdat_wrda %>% left_join(wdat_center_1 %>% transmute(PC1.c = PC1, PC2.c = PC2, Country), by = "Country")
+
+g1 <- ggplot(wdat_center_1, aes(x = PC1, y = PC2, color = Continent)) + 
+  geom_point(data = wdat_1, aes(x = PC1, y = PC2, color = Continent), size = 1, alpha = 0.5) + 
+  geom_segment(data = wdat_1, aes(x = PC1, y = PC2, xend = PC1.c, yend = PC2.c), size = 0.2, alpha = 0.5) + 
+  geom_point(size = 4,shape = 21, color = "black", aes(fill = Continent)) + 
+  geom_text_repel(aes(label = Country), color = "black") + 
+  scale_color_manual(values = Continent_color, aesthetics = c("color","fill")) + 
+  labs(x = x_lab_1, y = y_lab_1, title = "vegan::dbrda") 
+
+## wcmdscale
+wpcoa_v <- wcmdscale(d = wdist, eig = TRUE)
+varPC1_2 <- round(wpcoa_v$eig[1]/sum(wpcoa_v$eig)*100,2)
+varPC2_2 <- round(wpcoa_v$eig[2]/sum(wpcoa_v$eig)*100,2)
+x_lab_2 <- paste0("PC1 (", varPC1_2, "%)")
+y_lab_2 <- paste0("PC2 (", varPC2_2, "%)")
+wdat_pcoa_v <- merge(wpcoa_v$points[,c(1,2)],
+                   wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
+  rename(PC1 = Dim1, PC2 = Dim2)
+wpcoa_fit <- envfit(wpcoa_v ~ Country, data = wmeta)
+wdat_center_2 <- wpcoa_fit$factors$centroids %>% as.data.frame() %>% 
+  rownames_to_column(var = "Country") %>%
+  transmute(Country = str_remove(Country,"Country"),PC1 = Dim1, PC2 = Dim2) %>%
+  left_join(wmeta %>% dplyr::select(Country, Continent) %>% unique(),by = "Country")
+wdat_2 <- wdat_pcoa_v %>% left_join(wdat_center_2 %>% transmute(PC1.c = PC1, PC2.c = PC2, Country), by = "Country")
+
+g2 <- ggplot(wdat_center_2, aes(x = PC1, y = PC2, color = Continent)) + 
+  geom_point(data = wdat_2, aes(x = PC1, y = PC2, color = Continent), size = 1, alpha = 0.5) + 
+  geom_segment(data = wdat_2, aes(x = PC1, y = PC2, xend = PC1.c, yend = PC2.c), size = 0.2, alpha = 0.5) + 
+  geom_point(size = 4,shape = 21, color = "black", aes(fill = Continent)) + 
+  geom_text_repel(aes(label = Country), color = "black") + 
+  scale_color_manual(values = Continent_color, aesthetics = c("color","fill")) + 
+  labs(x = x_lab_2, y = y_lab_2, title = "vegan::wcmdscale") 
+
+## pcoa
+pcoa_3 <- pcoa(wdist)
+varPC1_3 <- round(pcoa_3$values$Relative_eig[1]*100, 2)
+varPC2_3 <- round(pcoa_3$values$Relative_eig[2]*100, 2)
+x_lab_3 <- paste0("PC1 (", varPC1_3, "%)")
+y_lab_3 <- paste0("PC2 (", varPC2_3, "%)")
+pcoa_dat_3 <- merge(pcoa_3$vectors[,1:2], 
+                    wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
+  rename(PC1 = Axis.1, PC2 = Axis.2)
+wdat_center_3 <- pcoa_dat_3 %>% group_by(Country) %>% 
+        summarise(across(starts_with("PC"), mean)) %>% dplyr::select(-PCRConc) %>% 
+  left_join(wmeta %>% dplyr::select(Country, Continent) %>% unique(),by = "Country")
+wdat_3 <- pcoa_dat_3 %>% left_join(wdat_center_3%>% transmute(PC1.c = PC1, PC2.c = PC2, Country), by = "Country")
+g3 <- ggplot(wdat_center_3, aes(x = PC1, y = PC2, color = Continent)) + 
+  geom_point(data = wdat_3, aes(x = PC1, y = PC2, color = Continent), size = 1, alpha = 0.5) + 
+  geom_segment(data = wdat_3, aes(x = PC1, y = PC2, xend = PC1.c, yend = PC2.c), size = 0.2, alpha = 0.5) + 
+  geom_point(size = 4,shape = 21, color = "black", aes(fill = Continent)) + 
+  geom_text_repel(aes(label = Country), color = "black") + 
+  scale_color_manual(values = Continent_color, aesthetics = c("color","fill")) + 
+  labs(x = x_lab_3, y = y_lab_3, title = "ape::pcoa") 
+
+library(patchwork)
+g <- g1+g2+g3
+```
 
 
 
