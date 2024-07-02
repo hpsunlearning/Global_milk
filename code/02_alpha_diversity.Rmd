@@ -22,9 +22,9 @@ library(tidyverse)
 
 ## load data
 ```{r}
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
-temp_out = "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/alpha/"
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
+temp_out = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/alpha/"
 dat_alpha <- left_join(alpha_boot, meta_all, by = "SampleID")
 ```
 

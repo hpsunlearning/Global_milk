@@ -22,7 +22,12 @@ library(tidyverse)
 
 ## load data
 ```{r}
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_uu.RData")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_wu.RData")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_bray.RData")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_jaccard.RData")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
 ```
 
 ## function
@@ -69,6 +74,8 @@ meta_global <- meta_global[!duplicated(meta_global$Mother_ID),] %>%
   mutate(Maternal_BMI = Maternal_weight_kg/(Maternal_height_cm/100)/(Maternal_height_cm/100)) %>% 
   filter(Seq_count >= depth)
 
+meta_global <- meta_global %>% filter(SampleID %in% alpha_boot$SampleID)
+
 meta_global %>% count(Country)
 meta_global %>% count(Continent)
 meta_global %>% count(Birth_mode)
@@ -78,21 +85,43 @@ meta_global %>% summarise(my_summarize(Maternal_weight_kg))
 meta_global %>% summarise(my_summarize(Maternal_height_cm))
 meta_global %>% summarise(my_summarize(Maternal_BMI))
 meta_global %>% summarise(my_summarize(Time_post_partum_day))
+
+# a <- table(dat$Continent, dat$Country) %>% as.data.frame() %>% filter(Freq>0)
+# write.csv(a, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/Global_samples_by_Country.csv",row.names = FALSE)
+
+
 ```
 
-## alpha linear model everything
+## global 16S data
 ```{r}
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
-temp_out = "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/alpha/"
-dat_alpha_global <- inner_join(alpha_boot, meta_global, by = "SampleID")
-metric <- names(alpha_boot)[2:5]
-names(metric) <- names(alpha_boot)[2:5]
+alpha_global <- alpha_boot %>% filter(SampleID %in% meta_global$SampleID)
+DM_bray_global <- usedist::dist_subset(DM_bray, meta_global$SampleID)
+DM_jaccard_global <- usedist::dist_subset(DM_jaccard, meta_global$SampleID)
+DM_uu_global <- usedist::dist_subset(DM_uu, meta_global$SampleID)
+DM_wu_global <- usedist::dist_subset(DM_wu, meta_global$SampleID)
 
+save(alpha_global, comp_kw_aov, Continent_color, Country_color, Country_font_color, Country_labels, 
+     depth, DM_bray_global, DM_jaccard_global, DM_uu_global, DM_wu_global, meta_global, my_summarize, 
+     phylo_all, phylo_decontam_clean, phylo_decontam_clean_rf, rarecurve_data, sample_depth, taxa,
+     file = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
+
+```
+
+## load global data
+```{r}
+load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
+temp_out = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/"
+```
+
+## alpha linear model global
+```{r}
+metric <- names(alpha_global)[2:5]
+names(metric) <- names(alpha_global)[2:5]
+dat <- alpha_global %>% left_join(meta_global, by = "SampleID")
 
 # country
-dat <- dat_alpha %>% filter(!is.na(DNA_Conc_ng_uL)) 
 alpha_lm_coef <- map_dfr(metric, function(a){
-  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + Country + Extraction_method + heat_inactivated")), data = dat)
+  fit <- lm(as.formula(paste0(a, "  ~ Country")), data = dat)
   anova_fit <- anova(fit)
   sum_fit <- summary(fit)
   effect_fit <- effectsize(anova_fit, "omega")
@@ -104,10 +133,10 @@ alpha_lm_coef <- map_dfr(metric, function(a){
   res_coef
 })
 write.csv(alpha_lm_coef, row.names = FALSE,
-          file = paste0(temp_out,"alpha_lm_Country_conc_method_all_coef.csv"))
+          file = paste0(temp_out,"alpha_lm_coef_Country.csv"))
 
 alpha_lm_omega <- map_dfr(metric, function(a){
-  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + Country + Extraction_method + heat_inactivated")), data = dat)
+  fit <- lm(as.formula(paste0(a, "  ~ Country")), data = dat)
   anova_fit <- anova(fit)
   sum_fit <- summary(fit)
   effect_fit <- effectsize(anova_fit, "omega")
@@ -119,12 +148,11 @@ alpha_lm_omega <- map_dfr(metric, function(a){
   res_anova
 })
 write.csv(alpha_lm_omega, row.names = FALSE,
-          file = paste0(temp_out,"alpha_lm_Country_conc_method_all_omega.csv"))
+          file = paste0(temp_out,"alpha_lm_omega_Country.csv"))
 
 # Continent
-dat <- dat_alpha %>% filter(!is.na(DNA_Conc_ng_uL)) 
 alpha_lm_coef <- map_dfr(metric, function(a){
-  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + Continent + Extraction_method + heat_inactivated")), data = dat)
+  fit <- lm(as.formula(paste0(a, "  ~ Continent")), data = dat)
   anova_fit <- anova(fit)
   sum_fit <- summary(fit)
   effect_fit <- effectsize(anova_fit, "omega")
@@ -136,10 +164,10 @@ alpha_lm_coef <- map_dfr(metric, function(a){
   res_coef
 })
 write.csv(alpha_lm_coef, row.names = FALSE,
-          file = paste0(temp_out,"alpha_lm_Continent_conc_method_all_coef.csv"))
+          file = paste0(temp_out,"alpha_lm_coef_Continent.csv"))
 
 alpha_lm_omega <- map_dfr(metric, function(a){
-  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + Continent + Extraction_method + heat_inactivated")), data = dat)
+  fit <- lm(as.formula(paste0(a, "  ~ Continent")), data = dat)
   anova_fit <- anova(fit)
   sum_fit <- summary(fit)
   effect_fit <- effectsize(anova_fit, "omega")
@@ -151,53 +179,17 @@ alpha_lm_omega <- map_dfr(metric, function(a){
   res_anova
 })
 write.csv(alpha_lm_omega, row.names = FALSE,
-          file = paste0(temp_out,"alpha_lm_Continent_conc_method_all_omega.csv"))
+          file = paste0(temp_out,"alpha_lm_omega_Continent.csv"))
 
-# heat
-dat <- dat_alpha %>% filter(!is.na(DNA_Conc_ng_uL), heat_compare == "Y" ) 
-alpha_lm_heat_coef <- map_dfr(metric, function(a){
-  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + heat_inactivated")), data = dat)
-  anova_fit <- anova(fit)
-  sum_fit <- summary(fit)
-  effect_fit <- effectsize(anova_fit, "omega")
-  res_coef <- sum_fit$coefficients %>% as.data.frame() %>% 
-    rownames_to_column(var = "Var") %>% filter(Var != "(Intercept)")
-  res_anova <- right_join(anova_fit %>% as.data.frame() %>% rownames_to_column(var = "Parameter"),
-                          effect_fit %>% as.data.frame(), by = "Parameter")
-  res_coef$Metrics = a
-  res_coef
-})
-write.csv(alpha_lm_heat_coef, row.names = FALSE,
-          file = paste0(temp_out,"alpha_lm_heat_conc_coef.csv"))
-
-alpha_lm_heat_omega <- map_dfr(metric, function(a){
-  fit <- lm(as.formula(paste0(a, "  ~ DNA_Conc_ng_uL + PCRConc + heat_inactivated")), data = dat)
-  anova_fit <- anova(fit)
-  sum_fit <- summary(fit)
-  effect_fit <- effectsize(anova_fit, "omega")
-  res_coef <- sum_fit$coefficients %>% as.data.frame() %>% 
-    rownames_to_column(var = "Var") %>% filter(Var != "(Intercept)")
-  res_anova <- right_join(anova_fit %>% as.data.frame() %>% rownames_to_column(var = "Parameter"),
-                          effect_fit %>% as.data.frame(), by = "Parameter")
-  res_anova$Metrics = a
-  res_anova
-})
-write.csv(alpha_lm_heat_omega, row.names = FALSE,
-          file = paste0(temp_out,"alpha_lm_heat_conc_omega.csv"))
 ```
 
 
-## alpha in Global project
+## alpha in Global project plot
 ```{r}
-metric <- names(alpha_boot)[2:5]
-names(metric) <- names(alpha_boot)[2:5]
+metric <- names(alpha_global)[2:5]
+names(metric) <- names(alpha_global)[2:5]
+dat <- alpha_global %>% left_join(meta_global, by = "SampleID")
 
-dat <- rbind(dat_alpha %>% filter(!is.na(Country), Project %in% c("Global", "Upside", "Milkbank")),
-             dat_alpha %>% filter(!is.na(Country), Project=="PR") %>%
-               filter(TimePoint == 1200))
-
-a <- table(dat$Continent, dat$Country) %>% as.data.frame() %>% filter(Freq>0)
-write.csv(a, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/Global_samples_by_Country.csv",row.names = FALSE)
 
 # Country
 alpha_Country_grp <- map_dfr(metric, function(a){
@@ -206,14 +198,14 @@ alpha_Country_grp <- map_dfr(metric, function(a){
   res$grp
 })
 write.csv(alpha_Country_grp, row.names = FALSE,
-          file = paste0(temp_out,"kw_aov_grp_alpha_by_Country.csv"))
+          file = paste0(temp_out,"alpha_by_Country_kw_aov_grp.csv"))
 alpha_Country_pvalue <- map_dfr(metric, function(a){
   res <- comp_kw_aov(wdat = dat, x = "Country", y = a)
   res$comp$Metrics = a
   res$comp
 })
 write.csv(alpha_Country_pvalue, row.names = FALSE,
-          file = paste0(temp_out,"kw_aov_grp_alpha_pvalue_by_Country.csv"))
+          file = paste0(temp_out,"alpha_by_Country_kw_pvalue.csv"))
 
 alpha_Country_summary <- dat %>% dplyr::select(Faith_PD:Pielou_evenness, Country) %>% 
   group_by(Country) %>% 
@@ -258,7 +250,7 @@ ggsave(filename = paste0(temp_out, "alpha_by_Country_full.pdf"), device = cairo_
 # order by faith PD
 Country_ord <- alpha_Country_summary %>% filter(Metrics == "Faith_PD") %>% 
   dplyr::select(Country, Med) %>% 
-  left_join(meta_all %>% dplyr::select(Country, Continent) %>% unique(), by = "Country") %>% 
+  left_join(meta_global %>% dplyr::select(Country, Continent) %>% unique(), by = "Country") %>% 
   arrange(Continent, desc(Med)) %>% pull(Country)
 wdat$Country = factor(wdat$Country, levels = Country_ord, ordered = T)
 

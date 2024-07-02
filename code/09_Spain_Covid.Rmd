@@ -22,15 +22,15 @@ library(ape)
 library(rlist)
 library(ggrepel)
 library(tidyverse)
-temp_out <-  "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/COVID/"
+temp_out <-  "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/COVID/"
 covid_color <- c("N" = "#91CF60" , "Y" = "#FC8D59")
 ```
 
 ## alpha
 ### load data
 ```{r}
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
 
 dat_alpha <- left_join(alpha_boot, meta_all, by = "SampleID")
 ```

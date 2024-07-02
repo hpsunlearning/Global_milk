@@ -27,13 +27,13 @@ library(tidyverse)
 
 ## load data
 ```{r}
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_uu.RData")
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_wu.RData")
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_bray.RData")
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_jaccard.RData")
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
-temp_out = "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/beta/"
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_uu.RData")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_wu.RData")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_bray.RData")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_jaccard.RData")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
+temp_out = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/beta/"
 ```
 
 ## function

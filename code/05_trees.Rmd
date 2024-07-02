@@ -38,9 +38,9 @@ library(tidyverse)
 
 ## load data
 ```{r}
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
-load(file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_global.Rdata")
-temp_out = "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/species_tree/"
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_global.Rdata")
+temp_out = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/species_tree/"
 ```
 
 

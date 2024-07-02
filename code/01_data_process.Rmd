@@ -27,7 +27,7 @@ library(tidyverse)
 ## settings
 ```{r}
 # set path
-path_rec <- "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/"
+path_rec <- "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/"
 temp_out <- paste0(path_rec, "result/")
 # set colors, labs and so on
 col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
