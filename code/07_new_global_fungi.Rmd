@@ -56,6 +56,12 @@ load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rda
 meta_global <- meta_global %>% mutate(SampleID_clean = str_remove_all(SampleID, " "))
 both_sample <- intersect(meta_global$SampleID_clean, names(ft_ITS))
 meta_both <- meta_global %>% filter(SampleID_clean %in% both_sample)
+meta_both %>% count(Continent, Country)
+
+ft_ITS %>% select(meta_both$SampleID_clean) %>% 
+  colSums() %>% sort()
+ 
+
 ```
 
 ### save
@@ -72,9 +78,7 @@ temp_out = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/outp
 ```
 
 ## TBD 
-
-
-## alpha TBD
+### alpha TBD
 ### function
 ```{r}
 comp_kw_aov = function(wdat, x, y){
