@@ -110,3 +110,4 @@ rsconnect/
 .dropbox.cache
 
 ########## Project specified
+.DS_Store
