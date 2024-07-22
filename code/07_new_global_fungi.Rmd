@@ -12,7 +12,6 @@ library(purrr)
 library(furrr)
 library(picante)
 library(vegan)
-library(MASS)
 library(ggpubr)
 library(effectsize)
 library(ggtext)
@@ -23,105 +22,59 @@ library(tidyverse)
 ## prepare (run first time only)
 ### load data
 ```{r}
-load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
-load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_uu.RData")
-load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_wu.RData")
-load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_bray.RData")
-load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_jaccard.RData")
-load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
+path_rec <- "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/"
+temp_out <- "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/global/"
+
+a <- read.table(paste0(path_rec, "milk_mycobiome_handoff/dada2/dada2_feature_with-taxon-table.tsv"), sep = "\t")
+aa <- a$V84 %>% str_split_fixed(";", 8) %>% 
+  as.data.frame() %>% 
+  mutate(
+    Kingdom = str_replace(V1,"k__","k_"),
+    Phylum = str_remove(V2," p__"), Phylum = str_c("p_", Phylum, sep = ""),
+    Class = str_remove(V3," c__"), Class = str_c("c_", Class, sep = ""),
+    Order = str_remove(V4," o__"), Order = str_c("o_", Order, sep = ""),
+    Family = str_remove(V5," f__"),Family = str_c("f_", Family, sep = ""),
+    Genus = str_remove(V6," g__"), Genus = str_c("g_", Genus, sep = ""),
+    Species = str_remove(V7," s__"), Species = str_c("s_", Species, sep = ""),
+    SH = str_remove(V8," sh__"), SH = str_c("sh_", SH, sep = "")
+  ) %>% 
+  select(Kingdom:SH)
+taxa_ITS <- bind_cols(id = a$V1, aa) %>% 
+  mutate(ASV = str_c("asv_", 1:nrow(aa)),
+         taxa_long = str_c(Kingdom,Phylum,Class,Order,Family,Genus,Species,ASV,sep = ";"))
+
+ft_ITS <- read.table(paste0(path_rec, "milk_mycobiome_handoff/dada2/dada2_feature_table.tsv"), 
+                     sep = "\t", comment.char = "", skip = 1, header = T) %>% 
+  column_to_rownames(var = "X.OTU.ID") 
+colnames(ft_ITS) <- colnames(ft_ITS) %>% str_remove("^X") %>% str_remove("\\.filt")
+ft_ITS <- ft_ITS[,colSums(ft_ITS)>0]
 ```
 
-### function
+### load 16S and merge
 ```{r}
-comp_kw_aov = function(wdat, x, y){
-  #input data, respond variable y, categorize variable x
-  require(agricolae)
-  ktest1 = kruskal(wdat[y], wdat[x], alpha = 0.05, p.adj="none", group=T, main = "wdat", console=FALSE)
-  out_g_1 = ktest1$groups %>% rownames_to_column(var = "Var") %>% dplyr::select(Var, groups) %>% rename(KW_group = groups)
-  ktest2 = kruskal(wdat[y], wdat[x], alpha = 0.05, p.adj="none", group=F, main = "wdat", console=FALSE)
-  out_c_1 = ktest2$comparison %>% rownames_to_column(var = "comp") %>% dplyr::select(comp, pvalue) %>% rename(KW_pvalue = pvalue)
-  fit = aov(as.formula(paste0(y, "~", x)), wdat)
-  tukey1 = HSD.test(fit, x, group = T)
-  out_g_2 = tukey1$groups %>% rownames_to_column(var = "Var") %>% dplyr::select(Var, groups) %>% rename(aov_group = groups)
-  tukey2 = HSD.test(fit, x, group = F)
-  out_c_2 = tukey2$comparison %>% rownames_to_column(var = "comp") %>% dplyr::select(comp, pvalue) %>% rename(aov_pvalue = pvalue)
-  out_g = merge(out_g_1, out_g_2,by = 1)
-  out_c = merge(out_c_1, out_c_2,by = 1)
-  res = list(out_g, out_c)
-  names(res) = c("grp","comp")
-  res
-}
- 
-my_summarize = function(x){
-    data.frame(
-        N = n(),
-        N.nna = sum(!is.na(x)),
-        Min = min(x,na.rm = T),
-        Med = median(x, na.rm = T),
-        Mean = mean(x, na.rm = T),
-        Max = max(x,na.rm = T),
-        SD = sd(x,na.rm = T)
-    )
-}
-```
-
-### global meta
-```{r}
-meta_global <- rbind(meta_all %>% filter(!is.na(Country), Project %in% c("Global", "Milkbank")),
-                     meta_all %>% filter(!is.na(Country), Project=="PR") %>% filter(TimePoint == 1200)) %>% 
-  filter(Seq_count >= depth)
-
-meta_global <- meta_global[!duplicated(meta_global$Mother_ID),] %>% 
-  mutate(Maternal_BMI = Maternal_weight_kg/(Maternal_height_cm/100)/(Maternal_height_cm/100)) %>% 
-  filter(Seq_count >= depth)
-
-meta_global <- meta_global %>% filter(SampleID %in% alpha_boot$SampleID)
-
-meta_global %>% count(Country)
-meta_global %>% count(Continent)
-meta_global %>% count(Birth_mode)
-
-meta_global %>% summarise(my_summarize(Maternal_age))
-meta_global %>% summarise(my_summarize(Maternal_weight_kg))
-meta_global %>% summarise(my_summarize(Maternal_height_cm))
-meta_global %>% summarise(my_summarize(Maternal_BMI))
-meta_global %>% summarise(my_summarize(Time_post_partum_day))
-
-```
-
-### global 16S data
-```{r}
-alpha_global <- alpha_boot %>% filter(SampleID %in% meta_global$SampleID)
-DM_bray_global <- usedist::dist_subset(DM_bray, meta_global$SampleID)
-DM_jaccard_global <- usedist::dist_subset(DM_jaccard, meta_global$SampleID)
-DM_uu_global <- usedist::dist_subset(DM_uu, meta_global$SampleID)
-DM_wu_global <- usedist::dist_subset(DM_wu, meta_global$SampleID)
-
+load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
+meta_global <- meta_global %>% mutate(SampleID_clean = str_remove_all(SampleID, " "))
+both_sample <- intersect(meta_global$SampleID_clean, names(ft_ITS))
+meta_both <- meta_global %>% filter(SampleID_clean %in% both_sample)
 ```
 
 ### save
 ```{r}
-a <- meta_global %>% count(Continent, Country)
-write.csv(a, file = paste0(temp_out,"Global_samples_by_Country.csv"),row.names = FALSE, quote = FALSE)
-
-path_rec <- "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/"
-temp_out <- "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/global/"
-
-# save(alpha_global, comp_kw_aov, Continent_color, Country_color, Country_font_color, Country_labels,
-#      depth, DM_bray_global, DM_jaccard_global, DM_uu_global, DM_wu_global, meta_global, my_summarize,
-#      phylo_all, phylo_decontam_clean, phylo_decontam_clean_rf, rarecurve_data, sample_depth, taxa,
-#      file = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
+# save(ft_ITS, taxa_ITS, meta_both,
+#      file = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global_ITS.Rdata")
 ```
-
-
 
 ## load global data
 ```{r}
+load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global_ITS.Rdata")
 load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
 temp_out = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/"
 ```
 
-## alpha
+## TBD 
+
+
+## alpha TBD
 ### function
 ```{r}
 comp_kw_aov = function(wdat, x, y){

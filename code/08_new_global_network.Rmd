@@ -1,0 +1,32 @@
+---
+title: "Alpha diversity"
+author: "Haipeng Sun"
+date: "8/1/2022"
+output: html_document
+---
+
+## library
+```{r setup, message=FALSE, warning=FALSE}
+library(phyloseq)
+library(purrr)
+library(furrr)
+library(picante)
+library(vegan)
+library(MASS)
+library(ggpubr)
+library(effectsize)
+library(ggtext)
+library(glue)
+library(tidyverse)
+```
+
+## load data
+```{r}
+load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global_ITS.Rdata")
+load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
+temp_out = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/network"
+```
+
+##
+
+
