@@ -213,7 +213,36 @@ alpha_lm_omega <- map_dfr(metric, function(a){
 })
 write.csv(alpha_lm_omega, row.names = FALSE,
           file = paste0(temp_out,"alpha_lm_omega_Continent.csv"))
+##
+alpha_lm_coef <- map_dfr(metric, function(a){
+  fit <- lm(as.formula(paste0(a, "  ~ Time_post_partum_day" )), data = dat)
+  anova_fit <- anova(fit)
+  sum_fit <- summary(fit)
+  effect_fit <- effectsize(anova_fit, "omega")
+  res_coef <- sum_fit$coefficients %>% as.data.frame() %>% 
+    rownames_to_column(var = "Var") %>% filter(Var != "(Intercept)")
+  res_anova <- right_join(anova_fit %>% as.data.frame() %>% rownames_to_column(var = "Parameter"),
+                          effect_fit %>% as.data.frame(), by = "Parameter")
+  res_coef$Metrics = a
+  res_coef
+})
+write.csv(alpha_lm_coef, row.names = FALSE,
+          file = paste0(temp_out,"alpha_lm_coef_partum_day.csv"))
 
+alpha_lm_omega <- map_dfr(metric, function(a){
+  fit <- lm(as.formula(paste0(a, "  ~ Time_post_partum_day")), data = dat)
+  anova_fit <- anova(fit)
+  sum_fit <- summary(fit)
+  effect_fit <- effectsize(anova_fit, "omega")
+  res_coef <- sum_fit$coefficients %>% as.data.frame() %>% 
+    rownames_to_column(var = "Var") %>% filter(Var != "(Intercept)")
+  res_anova <- right_join(anova_fit %>% as.data.frame() %>% rownames_to_column(var = "Parameter"),
+                          effect_fit %>% as.data.frame(), by = "Parameter")
+  res_anova$Metrics = a
+  res_anova
+})
+write.csv(alpha_lm_omega, row.names = FALSE,
+          file = paste0(temp_out,"alpha_lm_omega_partum_day.csv"))
 ```
 
 
