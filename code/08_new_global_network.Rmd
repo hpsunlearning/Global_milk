@@ -30,7 +30,6 @@ library(tidyverse)
 load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global_ITS.Rdata")
 load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
 temp_out = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/network/"
-meta_global <- meta_global %>% mutate(SampleID_clean = str_remove_all(SampleID, " "))
 ```
 
 ## function
@@ -198,6 +197,8 @@ ft_its_wk_g <- aggregate_ft(ft = ft_its_wk, taxa = taxa_ITS, L = "Genus")
 ft_its_wk_g <- ft_its_wk_g[,colSums(ft_its_wk_g)>0]
 ra_its_wk_g <- sweep(ft_its_wk_g, 1, rowSums(ft_its_wk_g), `/`)
 
+meta_both <- meta_global %>% filter(SampleID_clean %in% rownames(ft_its_wk))
+
 # 16S
 ft_16s_wk <- phylo_decontam_clean@otu_table@.Data %>% t() %>% 
   as.data.frame() %>% rownames_to_column(var = "SampleID") %>% 
@@ -280,7 +281,7 @@ for (nn in names(res)){
   gg <- tbl_graph(directed = F, nodes = gdat$node, edges = gdat$edge) 
   
   #for (ll in c('kk', 'dh', 'drl','fr','gem','circle', 'graphopt', 'grid','lgl','mds','randomly')){
-  for (ll in c('fr','gem','circle')){
+  for (ll in c('fr','circle')){
     g <- ggraph(gg, layout = ll) +
       geom_edge_link(aes(colour = col)) +
       geom_node_point(aes(color = col_k), size = 3) +

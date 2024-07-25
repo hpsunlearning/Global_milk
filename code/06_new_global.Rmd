@@ -67,15 +67,28 @@ my_summarize = function(x){
 
 ### global meta
 ```{r}
+meta_common <- read.csv("~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/fungi_sample_common.csv") %>% 
+  select(-X)
+
 meta_global <- rbind(meta_all %>% filter(!is.na(Country), Project %in% c("Global", "Milkbank")),
-                     meta_all %>% filter(!is.na(Country), Project=="PR") %>% filter(TimePoint == 1200)) %>% 
+                     meta_all %>% filter(!is.na(Country), Project=="PR") %>% 
+                       filter(TimePoint == 1200),
+                     meta_all %>% filter(!is.na(Country), Project=="Family") %>% 
+                       filter(TimePoint == 1200)
+                     ) %>% 
   filter(Seq_count >= depth)
 
 meta_global <- meta_global[!duplicated(meta_global$Mother_ID),] %>% 
-  mutate(Maternal_BMI = Maternal_weight_kg/(Maternal_height_cm/100)/(Maternal_height_cm/100)) %>% 
-  filter(Seq_count >= depth)
+                       mutate(SampleID_clean = str_remove_all(SampleID, " "))
 
-meta_global <- meta_global %>% filter(SampleID %in% alpha_boot$SampleID)
+meta_global <- rbind(meta_global %>% filter(!Mother_ID %in% meta_common$Mother_ID),
+                     meta_common %>% filter(!duplicated(Mother_ID)))
+
+meta_global <- meta_global %>% left_join(sample_depth %>% dplyr::select(SampleID, decontam_cleaned), by = "SampleID")
+
+meta_global <- meta_global %>% filter(SampleID %in% alpha_rftb$SampleID) %>% 
+  mutate(Maternal_BMI = Maternal_weight_kg/(Maternal_height_cm/100)/(Maternal_height_cm/100))
+
 
 meta_global %>% count(Country)
 meta_global %>% count(Continent)
@@ -91,7 +104,7 @@ meta_global %>% summarise(my_summarize(Time_post_partum_day))
 
 ### global 16S data
 ```{r}
-alpha_global <- alpha_boot %>% filter(SampleID %in% meta_global$SampleID)
+alpha_global <- alpha_rftb %>% filter(SampleID %in% meta_global$SampleID)
 DM_bray_global <- usedist::dist_subset(DM_bray, meta_global$SampleID)
 DM_jaccard_global <- usedist::dist_subset(DM_jaccard, meta_global$SampleID)
 DM_uu_global <- usedist::dist_subset(DM_uu, meta_global$SampleID)
@@ -101,11 +114,10 @@ DM_wu_global <- usedist::dist_subset(DM_wu, meta_global$SampleID)
 
 ### save
 ```{r}
-a <- meta_global %>% count(Continent, Country)
-write.csv(a, file = paste0(temp_out,"Global_samples_by_Country.csv"),row.names = FALSE, quote = FALSE)
-
 path_rec <- "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/"
 temp_out <- "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/global/"
+a <- meta_global %>% count(Continent, Country)
+write.csv(a, file = paste0(temp_out,"Global_samples_by_Country.csv"),row.names = FALSE, quote = FALSE)
 
 # save(alpha_global, comp_kw_aov, Continent_color, Country_color, Country_font_color, Country_labels,
 #      depth, DM_bray_global, DM_jaccard_global, DM_uu_global, DM_wu_global, meta_global, my_summarize,
@@ -478,6 +490,8 @@ for(dd in c("uu","wu","bray","jaccard")){
 
 ### PCoA
 ```{r}
+library(gridExtra)
+library(ggrepel)
 for(dd in c("uu","wu","bray","jaccard")){
   wdist <- get(paste0("DM_",dd, "_global"))
   wmeta = meta_global %>% filter(SampleID %in% labels(wdist))

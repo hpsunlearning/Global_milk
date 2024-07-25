@@ -53,21 +53,26 @@ ft_ITS <- ft_ITS[,colSums(ft_ITS)>0]
 ### load 16S and merge
 ```{r}
 load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
+load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/phylo_meta.Rdata")
+
 meta_global <- meta_global %>% mutate(SampleID_clean = str_remove_all(SampleID, " "))
+meta_all <- meta_all %>% mutate(SampleID_clean = str_remove_all(SampleID, " "))
+
+a <- meta_all %>% filter(SampleID_clean %in% names(ft_ITS))
+write.csv(a, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/fungi_sample_common.csv")
+
 both_sample <- intersect(meta_global$SampleID_clean, names(ft_ITS))
 meta_both <- meta_global %>% filter(SampleID_clean %in% both_sample)
 meta_both %>% count(Continent, Country)
 
 ft_ITS %>% select(meta_both$SampleID_clean) %>% 
   colSums() %>% sort()
- 
-
 ```
 
 ### save
 ```{r}
-# save(ft_ITS, taxa_ITS, meta_both,
-#      file = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global_ITS.Rdata")
+ # save(ft_ITS, taxa_ITS, meta_both,
+ #      file = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global_ITS.Rdata")
 ```
 
 ## load global data
