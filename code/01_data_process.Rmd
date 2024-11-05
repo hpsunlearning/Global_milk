@@ -166,7 +166,7 @@ meta_all <- meta_all %>% mutate(Conti_grp = case_when(Continent == "AFRICA" ~ "A
                                               Country == "Puerto Rico" ~ "Puerto Rico",
                                               Continent == "AMERICA" & !Country %in% c("United States","Puerto Rico") ~ "Central and South America"))
 #4 mark if send for ITS
-temp <- read_excel("~/Dropbox/Rutgers/20220304_Milk_inventory/ITS_upside_removed/Metadata_global_milk_platemap.xlsx", sheet = "Global_milk_sample_mapping")
+temp <- read_excel("~/Dropbox/Rutgers/20220304_Milk_inventory/ITS_sent/Metadata_global_milk_platemap.xlsx", sheet = "Global_milk_sample_mapping")
 meta_all <- meta_all %>% mutate(ITS = ifelse(SampleID %in% temp$TubeID, "Y", "N"))
 rm(temp)
 #4 corrections
@@ -216,7 +216,7 @@ temp <- taxa %>% filter(id %in% unique(unlist(lst))) %>%
          minimum = ifelse(id %in% minimum, "Y", "N"),
          either = ifelse(id %in% either, "Y", "N"),
          both = ifelse(id %in% both, "Y", "N")) %>% 
-  select(taxa_long, prev, combined, minimum, either, both)
+  select(id, taxa_long, prev, combined, minimum, either, both)
 write.csv(temp, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/decontam_details.csv", quote = F, row.names = F)
 
 # use pre method to decontam
@@ -229,10 +229,11 @@ rm(contamdf, contam_id, a0,  a1, a2, a3, a4, prev, combined, minimum, either, bo
 ### filter unwanted taxa
 ```{r}
 remove_id <- c(taxa %>% filter(str_detect(Kingdom, "Unassigned")) %>% pull(id),
+               taxa %>% filter(Phylum == "p_") %>% pull(id),
                taxa %>% filter(str_detect(Kingdom, "Eukaryota")) %>% pull(id),
                taxa %>% filter(str_detect(taxa_long, "Chloroplast")) %>% pull(id),
                taxa %>% filter(str_detect(taxa_long, "Mitochondria")) %>% pull(id)
-               )
+               ) %>% unique()
 phylo_decontam_clean <- prune_taxa(!(taxa_names(phylo_decontam) %in% remove_id), phylo_decontam)
 rm(remove_id)
 mean(sample_sums(phylo_all))
@@ -271,8 +272,6 @@ a <- lapply(c("original", "decontamed", "decontam_cleaned"), function(x){
 rownames(a) <- c("original", "decontamed", "decontam_cleaned")
 
 write.csv(a, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/sample_clean_depth_summary.csv", quote = F, row.names = T)
-
-
 ```
 
 ### rarefy depth
@@ -378,7 +377,7 @@ alpha_rftb <- merge(a1, a2, by=0)
 names(alpha_rftb) <- c("SampleID","Faith_PD", "Observed_ASVs","Shannon_Index")
 alpha_rftb$Pielou_evenness <- alpha_rftb$Shannon_Index/log(alpha_rftb$Observed_ASVs)
 
-#save(alpha_boot, alpha_rftb,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
+save(alpha_boot, alpha_rftb,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/alpha.Rdata")
 ```
 
 ### compare
@@ -418,10 +417,10 @@ system.time(DM_jaccard <- avgdist(ft,dmethod = "jaccard", sample = depth, iterat
 # user   system  elapsed 
 # 2782.295   27.415 2808.332 
 
-#save(DM_uu,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_uu.RData")
-#save(DM_wu,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_wu.RData")
-#save(DM_bray,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_bray.RData")
-#save(DM_jaccard,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_jaccard.RData")
+save(DM_uu,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_uu.RData")
+save(DM_wu,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_wu.RData")
+save(DM_bray,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_bray.RData")
+save(DM_jaccard,file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/beta_DM_jaccard.RData")
 ```
 
 ## data summary
