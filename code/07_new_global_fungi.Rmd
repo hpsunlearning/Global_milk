@@ -58,7 +58,7 @@ load(file = "~/Library/CloudStorage/Dropbox/Rutgers/20220606_RUN41_milk/Data/phy
 meta_global <- meta_global %>% mutate(SampleID_clean = str_remove_all(SampleID, " "))
 meta_all <- meta_all %>% mutate(SampleID_clean = str_remove_all(SampleID, " "))
 
-a <- meta_all %>% filter(SampleID_clean %in% names(ft_ITS))
+a <- meta_all %>% filter(SampleID_clean %in% names(ft_ITS)) %>% filter(Project != "Covid Mom")
 write.csv(a, file = "~/Dropbox/Rutgers/20220606_RUN41_milk/Data/fungi_sample_common.csv")
 
 both_sample <- intersect(meta_global$SampleID_clean, names(ft_ITS))

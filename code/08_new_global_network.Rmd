@@ -197,10 +197,11 @@ ft_its_wk_g <- aggregate_ft(ft = ft_its_wk, taxa = taxa_ITS, L = "Genus")
 ft_its_wk_g <- ft_its_wk_g[,colSums(ft_its_wk_g)>0]
 ra_its_wk_g <- sweep(ft_its_wk_g, 1, rowSums(ft_its_wk_g), `/`)
 
-meta_both <- meta_global %>% filter(SampleID_clean %in% rownames(ft_its_wk))
+meta_both <- meta_global %>% filter(SampleID_clean %in% rownames(ft_its_wk)) %>% 
+  filter(Project != "Covid Mom")
 
 # 16S
-ft_16s_wk <- phylo_decontam_clean@otu_table@.Data %>% t() %>% 
+ft_16s_wk <- phylo_global_decontam_clean@otu_table@.Data %>% t() %>% 
   as.data.frame() %>% rownames_to_column(var = "SampleID") %>% 
   mutate(SampleID_clean = str_remove_all(SampleID, " ")) %>% 
   filter(SampleID_clean %in% (meta_global %>% pull(SampleID_clean))) %>% 

@@ -826,7 +826,7 @@ phylo_global_g <- tax_glom(phylo_global_decontam_clean_rf, taxrank = "Genus", NA
 library(UpSetR)
 for (taxrank in c("ASV","Species","Genus")){
   if (taxrank == "ASV"){
-    ft <- otu_table(phylo_global@otu_table) %>% as.data.frame() %>% t()
+    ft <- otu_table(phylo_global_decontam_clean_rf@otu_table) %>% as.data.frame() %>% t()
   }else if(taxrank == "Species"){
     ft <- otu_table(phylo_global_s@otu_table) %>% as.data.frame() %>% t()
   }else if(taxrank == "Genus"){
@@ -1156,9 +1156,9 @@ for (taxrank in c("ASV", "Species", "Genus")){
                      rand_formula = NULL,
                      p_adj_method = "holm", pseudo_sens = TRUE,
                      prv_cut = 0.10, lib_cut = 1000, s0_perc = 0.05,
-                     group = "Country", struc_zero = FALSE, neg_lb = FALSE,
+                     group = "Country", struc_zero = TRUE, neg_lb = FALSE,
                      alpha = 0.05, n_cl = 10, verbose = TRUE,
-                     global = TRUE, pairwise = FALSE, 
+                     global = TRUE, pairwise = TRUE, 
                      dunnet = TRUE, trend = FALSE,
                      iter_control = list(tol = 1e-5, max_iter = 20, 
                                          verbose = FALSE),
@@ -1276,10 +1276,21 @@ for (taxrank in c("ASV", "Species", "Genus")){
 
 ### decontam taxa
 ```{r}
+load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
+temp_out <- "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/taxa/"
+contam_asv <- read_csv("~/Dropbox/Rutgers/20220606_RUN41_milk/Data/output/decontam_details.csv",show_col_types = FALSE)
 
+ft <- otu_table(phylo_global@otu_table) %>% as.data.frame()
+n = nrow(meta_global)
+ft <- ft[rowSums(ft)>0, ]
+ft <- ft/colSums(ft)[1]
+dat <- data.frame(id = rownames(ft), prevalence = rowSums(ft>0)/n*100, abundance =  rowMeans(ft))
 
+dat2 <- dat %>% filter(id %in% (contam_asv %>% filter(prev=="Y") %>% pull(id))) %>% 
+  left_join(taxa, by = "id") %>% 
+  dplyr::select(Kingdom:ASV, prevalence, abundance)
 
-
+write_csv(dat2, file = paste0(temp_out,"contam_asv_pre.csv"))
 
 
 
