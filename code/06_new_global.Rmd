@@ -1291,14 +1291,18 @@ dat2 <- dat %>% filter(id %in% (contam_asv %>% filter(prev=="Y") %>% pull(id))) 
   dplyr::select(Kingdom:ASV, prevalence, abundance)
 
 write_csv(dat2, file = paste0(temp_out,"contam_asv_pre.csv"))
-
-
-
-
-
-
 ```
 
+### methanogen
+```{r}
+ft <- otu_table(phylo_global_g@otu_table) %>% as.data.frame() %>% 
+  rownames_to_column(var = "id") %>% 
+  left_join(taxa, by = "id") %>% 
+  filter(str_detect(taxa_long, "Methano")) %>% 
+  dplyr::select(-c(id,Kingdom:ASV)) %>% column_to_rownames(var = "taxa_long")
+  
+rowSums(ft)
+```
 
 
 
