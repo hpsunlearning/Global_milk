@@ -85,6 +85,7 @@ meta_global <- meta_global[!duplicated(meta_global$Mother_ID),] %>%
 
 meta_global <- rbind(meta_global %>% filter(!Mother_ID %in% meta_common$Mother_ID),
                      meta_common %>% filter(!duplicated(Mother_ID)))
+meta_global <- meta_global %>% filter(Project != "Covid Mom")
 
 meta_global <- meta_global %>% left_join(sample_depth %>% dplyr::select(SampleID, decontam_cleaned), by = "SampleID")
 
@@ -229,6 +230,22 @@ taxa <- taxa %>%
                             str_detect(Phylum, "Campilobacterota") ~ "p_Campylobacterota",
                             TRUE ~ Phylum))
 taxa$Phylum %>% unique() %>% sort()
+
+taxa <- taxa %>% 
+  mutate(Class_l = case_when(Class == "c_" ~ str_c(Phylum, Class, sep = ";"),
+                             TRUE ~ Class),
+         Order_l = case_when(Order == "o_" ~ str_c(Class_l, Order, sep = ";"),
+                             str_detect(Order, "uncultured") ~ str_c(Class_l, Order, sep = ";"),
+                             TRUE ~ Order),
+         Family_l = case_when(Family == "f_" ~ str_c(Order_l, Family, sep = ";"),
+                              str_detect(Family, "uncultured") ~ str_c(Order_l, Family, sep = ";"),
+                              TRUE ~ Family),
+         Genus_l = case_when(Genus == "g_" ~ str_c(Family_l, Genus, sep = ";"),
+                             str_detect(Genus, "uncultured") ~ str_c(Family_l, Genus, sep = ";"),
+                             TRUE ~ Genus),
+         Species_l = case_when(Species == "s_" ~ str_c(Genus_l, Species, sep = ";"),
+                               str_detect(Species, "uncultured|metagenome") ~ str_c(Genus_l, Species, sep = ";"),
+                               TRUE ~ Species))
 
 ## summary data flow
 sink("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/sample_project_sum.txt")
@@ -813,9 +830,10 @@ for(dd in c("uu","wu","bray","jaccard")){
 
 ## taxa
 ### load data
-```{r}
+```{r message=FALSE, warning=FALSE}
 load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
 temp_out <- "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/taxa/"
+options(getClass.msg=FALSE)
 phylo_global_s <- tax_glom(phylo_global_decontam_clean_rf, taxrank = "Species", NArm=FALSE)
 phylo_global_g <- tax_glom(phylo_global_decontam_clean_rf, taxrank = "Genus", NArm=FALSE)
 
@@ -946,13 +964,13 @@ ra = 0.01
 for (taxrank in c("ASV", "Species","Genus")){
   if(taxrank == "ASV"){
     ft <- otu_table(phylo_global_decontam_clean_rf@otu_table) %>% as.data.frame()
-    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Genus,Species,ASV, sep = ";"))
+    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Phylum,Species_l,ASV, sep = ";"))
   }else if(taxrank == "Species"){
     ft <- otu_table(phylo_global_s@otu_table) %>% as.data.frame()
-    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Genus,Species, sep = ";"))
+    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Phylum,Species_l, sep = ";"))
   }else if(taxrank == "Genus"){
     ft <- otu_table(phylo_global_g@otu_table) %>% as.data.frame()
-    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Family,Genus, sep = ";"))
+    taxa_temp <- taxa %>% mutate(taxa_long = str_c(phylum,Genus_l, sep = ";"))
   }
   n = nrow(meta_global_rf)
   ft2 <- t(ft)
@@ -981,35 +999,37 @@ for (taxrank in c("ASV", "Species","Genus")){
   write.csv(res_all, file = paste0(temp_out,"Prevalence_", taxrank, "_in_global_by_Country.csv"), row.names = F, quote = F)
 }
 
-
 for (taxrank in c("ASV", "Species", "Genus")){
   if(taxrank == "ASV"){
     ft <- otu_table(phylo_global_decontam_clean_rf@otu_table) %>% as.data.frame()
-    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Family,Genus,Species,ASV, sep = ";"))
+    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Phylum,Species_l,ASV, sep = ";"))
   }else if(taxrank == "Species"){
     ft <- otu_table(phylo_global_s@otu_table) %>% as.data.frame()
-    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Family,Genus,Species, sep = ";"))
+    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Phylum,Species_l, sep = ";"))
   }else if(taxrank == "Genus"){
     ft <- otu_table(phylo_global_g@otu_table) %>% as.data.frame()
-    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Family,Genus, sep = ";"))
+    taxa_temp <- taxa %>% mutate(taxa_long = str_c(phylum,Genus_l, sep = ";"))
   }
   
   select_top_pre <- read.csv(paste0(temp_out,"Prevalence_", taxrank, "_in_global_by_Country.csv"))
   top_pre_id <- select_top_pre$id %>% unique()
   dat <- read_csv(paste0(temp_out,"Prevalence_", taxrank, "_in_global.csv"))
   select_id <- dat %>% filter(prevalence>prev | abundance > ra) %>% pull(id)
-  ft <- ft[rowSums(ft)>0, ]
   
-  meta_global_ord <- meta_global_rf %>% arrange(Continent, Country)
-  wft <- ft[select_id, meta_global_ord %>% pull(SampleID)]
-  if (nrow(wft)>50){
-    wft <- wft[(rowSums(wft) %>% sort(.,decreasing = T))[1:50] %>% names(),]
+  ft_logra <- log10((ft + 0.5)/colSums(ft)[1])
+  
+  meta_global_ord <- meta_global_rf %>% arrange(Continent, Country, SampleID)
+  ft_select <- ft[select_id, meta_global_ord %>% pull(SampleID)]
+  if (nrow(ft_select)>50){
+    ft_select <- ft_select[(rowSums(ft_select) %>% sort(.,decreasing = T))[1:50] %>% names(),]
   }
-  wft <- log10((wft + 0.5)/colSums(ft)[1])
+  
+  wft <- ft_logra[rownames(ft_select),]
   wft <- wft %>% rownames_to_column(var="id") %>% 
     left_join(taxa_temp %>% dplyr::select(id, taxa_long), by = "id") %>% 
     dplyr::select(-id) %>% dplyr::select(taxa_long, everything())
   wft2 = wft %>% column_to_rownames(var = "taxa_long")
+  wft2 <- wft2[,meta_global_ord$SampleID]
   df_row_name_label = structure(rownames(wft2), names = rownames(wft2))
   df_col = meta_global_ord %>% dplyr::select(Continent, Country)
   column_ha = HeatmapAnnotation(df = df_col %>% dplyr::select(Continent, Country), 
@@ -1046,6 +1066,12 @@ for (taxrank in c("ASV", "Species", "Genus")){
                 title_position = "topleft", 
                 labels_gp = gpar(fontsize = 14, fontface = "bold"),
                 title_gp = gpar(fontsize = 14, fontface = "bold"))
+  lgd3 = Legend(col_fun = mat_col_fun, title = "Relative abundance", 
+                at = c(-4, -3.3, -2.6, -1.9, -1.2, -0.5),                 
+                labels = c("0.01%", "0.05%", "0.25%", "1.25%", "6.25%", "31.25%"), 
+                title_position = "topleft",
+                labels_gp = gpar(fontsize = 14, fontface = "bold"), 
+                title_gp = gpar(fontsize = 14, fontface = "bold"))
 
   pd = packLegend(list = list(lgd1, lgd2, lgd3), direction = "vertical")  
   p = draw(p1, annotation_legend_side = "left", annotation_legend_list = pd)
@@ -1075,15 +1101,16 @@ for (taxrank in c("ASV", "Species", "Genus")){
   draw(p)
   dev.off()
   
-  wft <- ft[top_pre_id, meta_global_rf %>% pull(SampleID)]
-  if (nrow(wft)>50){
-    wft <- wft[(rowSums(wft) %>% sort(.,decreasing = T))[1:50] %>% names(),]
+  ft_select <- ft[top_pre_id, meta_global_ord %>% pull(SampleID)]
+  if (nrow(ft_select)>50){
+    ft_select <- ft_select[(rowSums(ft_select) %>% sort(.,decreasing = T))[1:50] %>% names(),]
   }
-  wft <- log10((wft + 0.5)/colSums(ft)[1])
+  wft <- ft_logra[rownames(ft_select),]
   wft <- wft %>% rownames_to_column(var="id") %>% 
     left_join(taxa_temp %>% dplyr::select(id, taxa_long), by = "id") %>% 
     dplyr::select(-id) %>% dplyr::select(taxa_long, everything())
   wft2 = wft %>% column_to_rownames(var = "taxa_long")
+  wft2 <- wft2[,meta_global_ord$SampleID]
   df_row_name_label = structure(rownames(wft2), names = rownames(wft2))
   row_dend = as.dendrogram(hclust(dist(wft2)))
   
@@ -1137,7 +1164,7 @@ for (taxrank in c("ASV", "Species", "Genus")){
 library(ANCOMBC)
 library(ComplexHeatmap)
 
-for (taxrank in c("ASV", "Species", "Genus")){
+for (taxrank in c("Genus", "ASV", "Species")){
   if(taxrank == "ASV"){
     phylotmp <- phylo_global_decontam_clean_rf
     taxa_temp <- taxa %>% mutate(taxa_long = str_c(Family,Genus,Species,ASV, sep = ";"))
@@ -1148,6 +1175,8 @@ for (taxrank in c("ASV", "Species", "Genus")){
     phylotmp <- phylo_global_g
     taxa_temp <- taxa %>% mutate(taxa_long = str_c(Family,Genus, sep = ";"))
   }
+  #trace(ancombc2, edit = TRUE)
+  #line 66 data = as.data.frame(meta_data)
   
   output <- ancombc2(data = phylotmp, 
                      #meta_data = meta_global_rf, 
@@ -1155,9 +1184,9 @@ for (taxrank in c("ASV", "Species", "Genus")){
                      fix_formula = "Country", 
                      rand_formula = NULL,
                      p_adj_method = "holm", pseudo_sens = TRUE,
-                     prv_cut = 0.10, lib_cut = 1000, s0_perc = 0.05,
+                     prv_cut = 0.1, lib_cut = 1000, s0_perc = 0.05,
                      group = "Country", struc_zero = TRUE, neg_lb = FALSE,
-                     alpha = 0.05, n_cl = 10, verbose = TRUE,
+                     alpha = 0.05, n_cl = 16, verbose = TRUE,
                      global = TRUE, pairwise = TRUE, 
                      dunnet = TRUE, trend = FALSE,
                      iter_control = list(tol = 1e-5, max_iter = 20, 
@@ -1173,12 +1202,11 @@ for (taxrank in c("ASV", "Species", "Genus")){
   
   for (dtype in c("bias_correct_log", "log")){
     if (dtype == "bias_correct_log"){
-      mat_col_fun = circlize::colorRamp2(c(-3, -2, -1, -0.5, 0.5 ,1, 2, 3), 
-                                         c("#253494","#225ea8","#1d91c0","#41b6c4","#7fcdbb","#c7e9b4","#edf8b1","#ffffd9"))
       bias_correct_log_table <- output$bias_correct_log_table
       bias_correct_log_table[is.na(bias_correct_log_table)] <- 0
       ft <- bias_correct_log_table[res$taxon,]
-      if(ncol(ft) != nrow(meta_global_rf)){next}
+      mat_col_fun = circlize::colorRamp2(c(-3, -2, -1, -0.5, 0.5 ,1, 2, 3), 
+                                         c("#253494","#225ea8","#1d91c0","#41b6c4","#7fcdbb","#c7e9b4","#edf8b1","#ffffd9"))
       lgd3 = Legend(col_fun = mat_col_fun, title = "Relative abundance", 
                     at = c(-3, -1.5, -0.5, 0 ,0.5, 1.5, 3),                 
                     #labels = c("0.01%", "0.05%", "0.25%", "1.25%", "6.25%", "31.25%"), 
@@ -1203,7 +1231,7 @@ for (taxrank in c("ASV", "Species", "Genus")){
       dplyr::select(-id) %>% dplyr::select(taxa_long, everything())
     wft2 = wft %>% column_to_rownames(var = "taxa_long")
     df_row_name_label = structure(rownames(wft2), names = rownames(wft2))
-    meta_global_ord <- meta_global_rf %>% arrange(Continent, Country)
+    meta_global_ord <- meta_global_rf %>% filter(SampleID %in% colnames(wft2)) %>%  arrange(Continent, Country, SampleID)
     wft2 <- wft2[,meta_global_ord$SampleID]
     df_col = meta_global_ord %>% dplyr::select(Continent, Country)
     column_ha = HeatmapAnnotation(df = df_col %>% dplyr::select(Continent, Country), 
@@ -1304,6 +1332,36 @@ ft <- otu_table(phylo_global_g@otu_table) %>% as.data.frame() %>%
 rowSums(ft)
 ```
 
+### taxa names fix once for all
+```{r}
+taxa2 <- taxa %>% 
+  mutate(Class_l = case_when(Class == "c_" ~ str_c(Phylum, Class, sep = ";"),
+                             TRUE ~ Class),
+         Order_l = case_when(Order == "o_" ~ str_c(Class_l, Order, sep = ";"),
+                             str_detect(Order, "uncultured") ~ str_c(Class_l, Order, sep = ";"),
+                             TRUE ~ Order),
+         Family_l = case_when(Family == "f_" ~ str_c(Order_l, Family, sep = ";"),
+                              str_detect(Family, "uncultured") ~ str_c(Order_l, Family, sep = ";"),
+                              TRUE ~ Family),
+         Genus_l = case_when(Genus == "g_" ~ str_c(Family_l, Genus, sep = ";"),
+                             str_detect(Genus, "uncultured") ~ str_c(Family_l, Genus, sep = ";"),
+                             TRUE ~ Genus),
+         Species_l = case_when(Species == "s_" ~ str_c(Genus_l, Species, sep = ";"),
+                               str_detect(Species, "uncultured|metagenome") ~ str_c(Genus_l, Species, sep = ";"),
+                               TRUE ~ Species))
+  
+
+
+
+
+
+
+
+
+
+
+
+```
 
 
 

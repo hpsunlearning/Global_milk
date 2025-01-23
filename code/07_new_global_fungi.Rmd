@@ -86,10 +86,13 @@ temp_out = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/outp
 ### summary
 ```{r}
 meta_global_rf <- meta_global_rf %>% filter(decontam_cleaned>depth) %>%  filter(Project != "Covid Mom")
-meta_both <- meta_both %>% filter(Project != "Covid Mom")
+meta_both <- meta_both %>% filter(Project != "Covid Mom", SampleID != "BR34.1")
 meta_global <- meta_global %>% filter(Project != "Covid Mom")
 meta_both %>% count(Country)
 meta_global %>% count(Continent, Country)
+
+write_csv(meta_global, file = paste0(temp_out,"meta_global.csv"))
+write_csv(meta_both, file = paste0(temp_out,"meta_both.csv"))
 ```
 
 ## Taxa
