@@ -294,6 +294,24 @@ meta_global_rf %>% summarise(my_summarize(Time_post_partum_day)) %>% print()
 
 a <- meta_global_rf %>% count(Continent, Country)
 write.csv(a, file = paste0(temp_out,"Global_samples_by_Country.csv"),row.names = FALSE, quote = FALSE)
+
+my_summarize2 = function(x){
+  data.frame(
+    N = n(),
+    #N.nna = sum(!is.na(x)),
+    Min = min(x,na.rm = T),
+    Q25 = quantile(x, 0.25),
+    Med = median(x, na.rm = T),
+    Mean = mean(x, na.rm = T),
+    Q75 = quantile(x, 0.75),
+    Max = max(x,na.rm = T),
+    Sum = sum(x, na.rm = T)
+  )
+}
+
+meta_global %>% summarise(my_summarize2(Seq_count)) %>% print()
+meta_global %>% summarise(my_summarize2(decontam_cleaned)) %>% print()
+
 ```
 
 
