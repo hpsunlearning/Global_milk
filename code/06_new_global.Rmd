@@ -311,7 +311,6 @@ my_summarize2 = function(x){
 
 meta_global %>% summarise(my_summarize2(Seq_count)) %>% print()
 meta_global %>% summarise(my_summarize2(decontam_cleaned)) %>% print()
-
 ```
 
 
@@ -666,6 +665,38 @@ g <- ggplot(wdat, aes(Continent, value)) +
 ggsave(filename = paste0(temp_out, "alpha_by_Continent_full.pdf"), device = cairo_pdf, 
        plot = g, width = 14, height = 10, units = "in", dpi = 300) 
 
+stat.test <- wdat %>% group_by(Metrics) %>% 
+  rstatix::wilcox_test(value ~ Continent) %>% 
+  rstatix::adjust_pvalue(method = "fdr") %>%
+  rstatix::add_significance("p.adj") %>% 
+  rstatix::add_xy_position(x = "Continent", dodge = 0.8, scales = "free_y") %>% 
+  filter(p.adj.signif != "ns")
+
+g <- ggplot(wdat, aes(Continent, value)) + 
+  geom_boxplot(aes(color = Continent, fill = Continent),alpha = 0.7,  outlier.alpha = 0) + 
+  geom_point(aes(color = Continent), position = position_jitterdodge()) + 
+  stat_pvalue_manual(stat.test, label = "p.adj.signif", tip.length = 0) +
+  # geom_text(data = alpha_Continent_summary, 
+  #           aes(x =  Continent, y = 1.05 * Max, label = KW_group)) + 
+  scale_color_manual(values = Continent_color, aesthetics = c("color","fill")) + 
+  #scale_x_discrete(labels=country_labels) + 
+  labs(x = "", y = "") +
+  facet_wrap(~Metrics, nrow = 2, scales = "free") +
+  theme_bw() + theme(#aspect.ratio = 0.8,
+    legend.position="none",
+    panel.background = element_rect(fill = NA),
+    strip.text = element_text(size=12,color="black",face='bold'),
+    axis.title = element_text(size=12,color="black",face='bold'),
+    axis.text = element_text(size=12,color="black",face='bold'),
+    axis.text.x = element_markdown(size=12, face='bold',vjust = 0.5, hjust = 0.5),
+    axis.text.y = element_text(size=12,color="black",face='bold'),
+    legend.text = element_text(size=12,color="black",face='bold'),
+    legend.title = element_text(size=12,color="black",face='bold'),
+    title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = paste0(temp_out, "alpha_by_Continent_full_pvalue.pdf"), device = cairo_pdf, 
+       plot = g, width = 14, height = 10, units = "in", dpi = 300) 
+
+
 ```
 
 ## beta
@@ -854,6 +885,12 @@ temp_out <- "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/out
 options(getClass.msg=FALSE)
 phylo_global_s <- tax_glom(phylo_global_decontam_clean_rf, taxrank = "Species", NArm=FALSE)
 phylo_global_g <- tax_glom(phylo_global_decontam_clean_rf, taxrank = "Genus", NArm=FALSE)
+phylo_global_p <- tax_glom(phylo_global_decontam_clean_rf, taxrank = "Phylum", NArm=FALSE)
+
+
+
+
+
 
 ```
 
