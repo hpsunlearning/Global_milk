@@ -880,17 +880,14 @@ for(dd in c("uu","wu","bray","jaccard")){
 ## taxa
 ### load data
 ```{r message=FALSE, warning=FALSE}
-load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
-temp_out <- "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/taxa/"
+# load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
+# temp_out <- "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/taxa/"
+load("~/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
+temp_out <- "~/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/taxa/"
 options(getClass.msg=FALSE)
 phylo_global_s <- tax_glom(phylo_global_decontam_clean_rf, taxrank = "Species", NArm=FALSE)
 phylo_global_g <- tax_glom(phylo_global_decontam_clean_rf, taxrank = "Genus", NArm=FALSE)
 phylo_global_p <- tax_glom(phylo_global_decontam_clean_rf, taxrank = "Phylum", NArm=FALSE)
-
-
-
-
-
 
 ```
 
@@ -1387,34 +1384,77 @@ ft <- otu_table(phylo_global_g@otu_table) %>% as.data.frame() %>%
 rowSums(ft)
 ```
 
-### taxa names fix once for all
+### taxa diff boxplot by country
 ```{r}
-taxa2 <- taxa %>% 
-  mutate(Class_l = case_when(Class == "c_" ~ str_c(Phylum, Class, sep = ";"),
-                             TRUE ~ Class),
-         Order_l = case_when(Order == "o_" ~ str_c(Class_l, Order, sep = ";"),
-                             str_detect(Order, "uncultured") ~ str_c(Class_l, Order, sep = ";"),
-                             TRUE ~ Order),
-         Family_l = case_when(Family == "f_" ~ str_c(Order_l, Family, sep = ";"),
-                              str_detect(Family, "uncultured") ~ str_c(Order_l, Family, sep = ";"),
-                              TRUE ~ Family),
-         Genus_l = case_when(Genus == "g_" ~ str_c(Family_l, Genus, sep = ";"),
-                             str_detect(Genus, "uncultured") ~ str_c(Family_l, Genus, sep = ";"),
-                             TRUE ~ Genus),
-         Species_l = case_when(Species == "s_" ~ str_c(Genus_l, Species, sep = ";"),
-                               str_detect(Species, "uncultured|metagenome") ~ str_c(Genus_l, Species, sep = ";"),
-                               TRUE ~ Species))
-  
+diff_taxa <- c("g_Acinetobacter", "g_Alistipes", "g_Bacillus", "g_Bacteroides", 
+               "g_Bifidobacterium", "g_Gemella", "g_Lactobacillus","g_Muribaculaceae",
+               "g_Prevotella", "g_Pseudomonas", "g_Staphylococcus","g_Streptococcus")
 
+gg = "g_Pseudomonas"
 
+ft <- otu_table(phylo_global_g@otu_table) %>% as.data.frame()
+ft_ra <- ft/colSums(ft)[1]
+ft_ra <- ft_ra %>% rownames_to_column(var = "id") %>% left_join(taxa, by = "id")
 
-
-
-
-
-
-
-
+ft_log <- log10((ft + 0.5)/colSums(ft)[1])
+ft_log <- ft_log %>% rownames_to_column(var = "id") %>% left_join(taxa, by = "id")
+##log is better
+for (gg in diff_taxa){
+  for (dtype in c("log", "ra")){
+    if(dtype == "log"){
+      ft <- ft_log
+    }else{
+      ft <- ft_ra
+    }
+    ft <- ft %>% filter(Genus_l == gg) %>% 
+      column_to_rownames(var = "id") %>% t() %>% as.data.frame() %>% 
+      rownames_to_column(var = "SampleID") 
+    names(ft) <- c("SampleID","Value")
+    dat <- ft %>% left_join(meta_global_rf, by = "SampleID") %>% 
+      mutate(Country = factor(Country,
+                              levels = c("Equatorial Guinea", "Kenya", "Senegal", "South Sudan", "Tanzania",
+                                         "Ecuador", "ElSalvador", "Mexico", "Peru", "Puerto Rico", "United States",
+                                         "Austria", "Germany", "Netherlands", "Norway", "Spain"),
+                              ordered = T),
+             Value = as.numeric(Value)) %>% 
+      filter(!is.na(Country))
+    res <- comp_kw_aov(wdat = dat, x = "Country", y = "Value")
+    res_summary <- dat %>% dplyr::select(Value, Country) %>% 
+      group_by(Country) %>% 
+      summarise_all(my_summarize) %>% 
+      ungroup() %>%
+      unnest(cols = Value) %>% 
+      left_join(res$grp, by = c("Country"="Var")) %>% 
+      mutate(N_lab = str_c("",N))
+    
+    g <- ggplot(dat %>% 
+                  mutate(Country = factor(Country, levels= res_summary %>% arrange(desc(Med)) %>% pull(Country), ordered = T)),
+                aes(Country, Value)) + 
+      geom_boxplot(aes(color = Country, fill = Country), alpha = 0.6,  outlier.alpha = 0) + 
+      geom_point(aes(color = Country), position = position_jitterdodge()) + 
+      geom_text(data = res_summary, 
+                aes(x =  Country, y = 1.08 * Max, label = KW_group)) +
+      # geom_text(data = res_summary, 
+      #           aes(x =  Country, y = -0.01, label = N_lab)) +
+      scale_color_manual(values = Country_color, aesthetics = c("color","fill")) + 
+      scale_x_discrete(labels=Country_labels) + 
+      labs(x = "", y = ifelse(dtype == "log","LogRA","RA"), title = gg) +
+      theme_bw() + theme(#aspect.ratio = 0.8,
+        legend.position="none",
+        panel.background = element_rect(fill = NA),
+        strip.text = element_text(size=12,color="black",face='bold'),
+        axis.title = element_text(size=12,color="black",face='bold'),
+        axis.text = element_text(size=12,color="black",face='bold'),
+        axis.text.x = element_markdown(size=12, face='bold',angle=90,vjust = 0.5, hjust = 1),
+        axis.text.y = element_text(size=12,color="black",face='bold'),
+        legend.text = element_text(size=12,color="black",face='bold'),
+        legend.title = element_text(size=12,color="black",face='bold'),
+        title = element_text(size=12,color="black",face='bold'))
+    
+    ggsave(filename = paste0(temp_out, gg,"_by_Country_", dtype, "_ordered.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 7, units = "in", dpi = 300) 
+  }
+}
 
 ```
 
