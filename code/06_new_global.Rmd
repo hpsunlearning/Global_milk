@@ -1378,10 +1378,33 @@ write_csv(dat2, file = paste0(temp_out,"contam_asv_pre.csv"))
 ft <- otu_table(phylo_global_g@otu_table) %>% as.data.frame() %>% 
   rownames_to_column(var = "id") %>% 
   left_join(taxa, by = "id") %>% 
-  filter(str_detect(taxa_long, "Methano")) %>% 
-  dplyr::select(-c(id,Kingdom:ASV)) %>% column_to_rownames(var = "taxa_long")
-  
-rowSums(ft)
+  filter(str_detect(taxa_long, "Methanobacteriales")) %>% 
+  dplyr::select(-c(id,Kingdom:ASV, taxa_long, Class_l:Family_l, Species_l)) %>% column_to_rownames(var = "Genus_l") %>% 
+  t() %>% as.data.frame() %>% rownames_to_column(var = "SampleID") %>% 
+  left_join(meta_global_rf %>% dplyr::select(SampleID, Country), by = "SampleID") 
+
+my_summarize2 <-  function(x){
+  data.frame(
+    N = n(),
+    N.none0 = sum(x>0),
+    # Min = min(x,na.rm = T),
+    # Med = median(x, na.rm = T),
+    Mean = mean(x, na.rm = T)
+    # Max = max(x,na.rm = T),
+    # SD = sd(x,na.rm = T)
+  ) %>% 
+    mutate(
+      percent.none0 = N.none0/N
+    )
+}
+
+methanogen_summary <- ft %>% dplyr::select(-SampleID) %>% 
+      group_by(Country) %>% 
+      summarise_all(my_summarize2) %>% 
+      ungroup() %>% 
+      unnest(cols = c("g_Methanosphaera","g_Methanobacterium","g_Methanobrevibacter"),names_sep = ";")
+
+write_csv(methanogen_summary, file = paste0(temp_out,"Methanogen_summary.csv"))
 ```
 
 ### taxa diff boxplot by country

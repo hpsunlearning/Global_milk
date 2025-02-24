@@ -81,13 +81,34 @@ ft_ITS %>% select(meta_both$SampleID_clean) %>%
 load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global_ITS.Rdata")
 load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
 temp_out = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/"
+
+taxa_ITS  <- taxa_ITS %>% 
+  mutate(Class_l = case_when(Class == "c_" ~ str_c(Phylum, Class, sep = ";"),
+                             TRUE ~ Class),
+         Order_l = case_when(Order == "o_" ~ str_c(Class_l, Order, sep = ";"),
+                             str_detect(Order, "uncultured") ~ str_c(Class_l, Order, sep = ";"),
+                             TRUE ~ Order),
+         Family_l = case_when(Family == "f_" ~ str_c(Order_l, Family, sep = ";"),
+                              str_detect(Family, "uncultured") ~ str_c(Order_l, Family, sep = ";"),
+                              TRUE ~ Family),
+         Genus_l = case_when(Genus == "g_" ~ str_c(Family_l, Genus, sep = ";"),
+                             str_detect(Genus, "uncultured") ~ str_c(Family_l, Genus, sep = ";"),
+                             TRUE ~ Genus),
+         Species_l = case_when(Species == "s_" ~ str_c(Genus_l, Species, sep = ";"),
+                               str_detect(Species, "uncultured|metagenome") ~ str_c(Genus_l, Species, sep = ";"),
+                               TRUE ~ Species))
+
+meta_global_rf <- meta_global_rf %>% filter(decontam_cleaned>depth) %>%  filter(Project != "Covid Mom")
+meta_both <- meta_both %>% filter(Project != "Covid Mom", SampleID != "BR34.1") 
+meta_both <- meta_both %>% split(meta_both$Country) %>% lapply(., function(x){
+  x$n = 1:nrow(x)
+  x$new_name = str_c(x$Country, "_", x$n)
+  x}) %>% do.call(rbind, .)
+meta_global <- meta_global %>% filter(Project != "Covid Mom")
 ```
 
 ### summary
 ```{r}
-meta_global_rf <- meta_global_rf %>% filter(decontam_cleaned>depth) %>%  filter(Project != "Covid Mom")
-meta_both <- meta_both %>% filter(Project != "Covid Mom", SampleID != "BR34.1")
-meta_global <- meta_global %>% filter(Project != "Covid Mom")
 meta_both %>% count(Country)
 meta_global %>% count(Continent, Country)
 
@@ -154,18 +175,11 @@ ft_ITS_clean_wk <- ft_ITS_clean %>% column_to_rownames(var = "id") %>%
   select(all_of(meta_both$SampleID_clean))
 
 ## Species
+#### read count
 ft_ITS_clean_wk_s <- ft_ITS_clean_wk %>% rownames_to_column(var = "id") %>% 
-  left_join(taxa_ITS %>% select(id, Kingdom:Species), by = "id") %>% 
-  mutate(grp = str_c(Kingdom, Phylum, Class, Order, Family, Genus, Species, sep = ";")) %>% 
-  mutate(taxa_label = case_when(Species == "s_" & Genus != "g_" ~ str_c(Phylum, Genus, Species, sep = ";"),
-                                Species == "s_" & Genus == "g_" & Family != "f_" ~ str_c(Phylum, Family, Species, sep = ";"),
-                                Species == "s_" & Genus == "g_" & Family == "f_" & Order != "o_" ~ str_c(Phylum, Order, Species, sep = ";"),
-                                Species == "s_" & Genus == "g_" & Family == "f_" & Order == "o_" & Class != "c_" ~ str_c(Phylum, Class, Species, sep = ";"),
-                                TRUE ~ str_c(Phylum, Species, sep = ";")))
-
-taxa_label <- ft_ITS_clean_wk_s %>% select(grp, taxa_label) %>% unique()
-
-ft_ITS_clean_wk_s <- ft_ITS_clean_wk_s %>% select(-c(id,Kingdom:Species,grp)) %>% 
+  left_join(taxa_ITS, by = "id") %>% 
+  mutate(taxa_label = str_c(Phylum, Species_l, sep = ";")) %>% 
+  select(-c(id,Kingdom:Species_l)) %>% 
   select(taxa_label ,dplyr::everything()) %>% 
   group_by(taxa_label) %>%
   summarise(across(everything(), sum),
@@ -183,17 +197,21 @@ ft_tmp <- ft_ITS_clean_wk_s %>% rownames_to_column(var = "taxa_label") %>%
   summarise(across(everything(), sum),
             .groups = 'drop') %>% 
   ungroup() %>% 
-  pivot_longer(cols = -taxa_label) 
+  pivot_longer(cols = -taxa_label) %>% 
+  left_join(meta_both, by = c("name" = "SampleID_clean")) %>% 
+  arrange(Continent, Country) 
 
-sample_ord <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% pull(SampleID_clean)
-
+sample_ord <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% pull(new_name)
+sample_col <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% 
+  mutate(color = Country_color[Country]) %>% pull(color)
 col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
                brewer.pal(8, "Set2"), brewer.pal(7, "Accent")) %>% unique()
-cols = c(col_vector[1:21])
+cols = c("gray30", col_vector[1:20])
 
-g <- ggplot(ft_tmp %>% mutate(name = factor(name, levels = sample_ord, ordered = TRUE)),
-            aes(name, value)) +
-  geom_col(aes(fill = taxa_label), position = "stack") +
+g <- ggplot(ft_tmp %>% mutate(name = factor(new_name, levels = sample_ord, ordered = TRUE)),
+            aes(new_name, value)) +
+  geom_col(aes(fill = taxa_label), position = "stack") + 
+  scale_y_continuous(expand = c(0,0)) +
   scale_fill_manual(values = cols) + 
   guides(fill=guide_legend(ncol =1)) + 
   labs(x = "", y = "Read counts") + 
@@ -203,30 +221,24 @@ g <- ggplot(ft_tmp %>% mutate(name = factor(name, levels = sample_ord, ordered =
     strip.text = element_text(size=12,color="black",face='bold'),
     axis.title = element_text(size=12,color="black",face='bold'),
     axis.text = element_text(size=12,color="black",face='bold'),
-    axis.text.x = element_markdown(size=12, face='bold',angle=90,vjust = 0.5, hjust = 1),
+    axis.text.x = element_markdown(size=12, face='bold',angle=90,vjust = 0.5, hjust = 1, color = sample_col),
     axis.text.y = element_text(size=12,color="black",face='bold'),
     legend.text = element_text(size=12,color="black",face='bold'),
-    legend.title = element_text(size=12,color="black",face='bold'),
+    legend.title = element_blank(),
     title = element_text(size=12,color="black",face='bold'))
 
 ggsave(filename = paste0(temp_out, "read_count_fungi_species_per_sample.pdf"), device = cairo_pdf, 
        plot = g, width = 14, height = 8, units = "in", dpi = 300)  
 
+#### RA
 ft_ITS_clean_wk <- ft_ITS_clean_wk[, colSums(ft_ITS_clean_wk)>0]
 ra_ITS_clean_wk <- sweep(ft_ITS_clean_wk, 2, colSums(ft_ITS_clean_wk), `/`)
 
 ra_ITS_clean_wk_s <- ra_ITS_clean_wk %>% rownames_to_column(var = "id") %>% 
-  left_join(taxa_ITS %>% select(id, Kingdom:Species), by = "id") %>% 
-  mutate(grp = str_c(Kingdom, Phylum, Class, Order, Family, Genus, Species, sep = ";")) %>% 
-  mutate(taxa_label = case_when(Species == "s_" & Genus != "g_" ~ str_c(Phylum, Genus, Species, sep = ";"),
-                                Species == "s_" & Genus == "g_" & Family != "f_" ~ str_c(Phylum, Family, Species, sep = ";"),
-                                Species == "s_" & Genus == "g_" & Family == "f_" & Order != "o_" ~ str_c(Phylum, Order, Species, sep = ";"),
-                                Species == "s_" & Genus == "g_" & Family == "f_" & Order == "o_" & Class != "c_" ~ str_c(Phylum, Class, Species, sep = ";"),
-                                TRUE ~ str_c(Phylum, Species, sep = ";")))
+  left_join(taxa_ITS, by = "id") %>% 
+  mutate(taxa_label = str_c(Phylum, Species_l, sep = ";"))
 
-taxa_label <- ra_ITS_clean_wk_s %>% select(grp, taxa_label) %>% unique()
-
-ra_ITS_clean_wk_s <- ra_ITS_clean_wk_s %>% select(-c(id,Kingdom:Species,grp)) %>% 
+ra_ITS_clean_wk_s <- ra_ITS_clean_wk_s %>% select(-c(id,Kingdom:Species_l)) %>% 
   select(taxa_label ,dplyr::everything()) %>% 
   group_by(taxa_label) %>%
   summarise(across(everything(), sum),
@@ -242,17 +254,21 @@ ra_tmp <- ra_ITS_clean_wk_s %>% rownames_to_column(var = "taxa_label") %>%
   summarise(across(everything(), sum),
             .groups = 'drop') %>% 
   ungroup() %>% 
-  pivot_longer(cols = -taxa_label) 
+  pivot_longer(cols = -taxa_label) %>% 
+  left_join(meta_both, by = c("name" = "SampleID_clean")) %>% 
+  arrange(Continent, Country) 
 
-sample_ord <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% pull(SampleID_clean)
-
+sample_ord <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% pull(new_name)
+sample_col <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% 
+  mutate(color = Country_color[Country]) %>% pull(color)
 col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
                brewer.pal(8, "Set2"), brewer.pal(7, "Accent")) %>% unique()
-cols = c(col_vector[1:21])
+cols = c("gray30", col_vector[1:20])
 
-g <- ggplot(ra_tmp %>% mutate(name = factor(name, levels = sample_ord, ordered = TRUE)),
-            aes(name, value)) +
+g <- ggplot(ra_tmp %>% mutate(name = factor(new_name, levels = sample_ord, ordered = TRUE)),
+            aes(new_name, value)) +
   geom_col(aes(fill = taxa_label), position = "stack") +
+  scale_y_continuous(expand = c(0,0)) +
   scale_fill_manual(values = cols) + 
   guides(fill=guide_legend(ncol =1)) + 
   labs(x = "", y = "Read counts") + 
@@ -262,7 +278,7 @@ g <- ggplot(ra_tmp %>% mutate(name = factor(name, levels = sample_ord, ordered =
     strip.text = element_text(size=12,color="black",face='bold'),
     axis.title = element_text(size=12,color="black",face='bold'),
     axis.text = element_text(size=12,color="black",face='bold'),
-    axis.text.x = element_markdown(size=12, face='bold',angle=90,vjust = 0.5, hjust = 1),
+    axis.text.x = element_markdown(size=12, face='bold',angle=90,vjust = 0.5, hjust = 1, color = sample_col),
     axis.text.y = element_text(size=12,color="black",face='bold'),
     legend.text = element_text(size=12,color="black",face='bold'),
     legend.title = element_text(size=12,color="black",face='bold'),
@@ -271,13 +287,131 @@ g <- ggplot(ra_tmp %>% mutate(name = factor(name, levels = sample_ord, ordered =
 ggsave(filename = paste0(temp_out, "RA_fungi_species_per_sample.pdf"), device = cairo_pdf, 
        plot = g, width = 14, height = 8, units = "in", dpi = 300)  
 
+
+## Genus
+#### read count
+ft_ITS_clean_wk_g <- ft_ITS_clean_wk %>% rownames_to_column(var = "id") %>% 
+  left_join(taxa_ITS, by = "id") %>% 
+  mutate(taxa_label = str_c(Phylum, Genus_l, sep = ";")) %>% 
+  select(-c(id,Kingdom:Species_l)) %>% 
+  select(taxa_label ,dplyr::everything()) %>% 
+  group_by(taxa_label) %>%
+  summarise(across(everything(), sum),
+            .groups = 'drop') %>% 
+  ungroup() %>% 
+  column_to_rownames(var = "taxa_label")
+
+ft_ITS_clean_wk_g <- ft_ITS_clean_wk_g[, colSums(ft_ITS_clean_wk_g)>0]
+
+top_id <- (rowMeans(ft_ITS_clean_wk_g) %>% sort(decreasing = TRUE) %>% names())[1:15]
+
+ft_tmp <- ft_ITS_clean_wk_g %>% rownames_to_column(var = "taxa_label") %>% 
+  mutate(taxa_label = ifelse(taxa_label %in% top_id, taxa_label, "other")) %>% 
+  group_by(taxa_label) %>%
+  summarise(across(everything(), sum),
+            .groups = 'drop') %>% 
+  ungroup() %>% 
+  pivot_longer(cols = -taxa_label) %>% 
+  left_join(meta_both, by = c("name" = "SampleID_clean")) %>% 
+  arrange(Continent, Country) 
+
+sample_ord <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% pull(new_name)
+sample_col <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% 
+  mutate(color = Country_color[Country]) %>% pull(color)
+
+col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
+               brewer.pal(8, "Set2"), brewer.pal(7, "Accent")) %>% unique()
+cols = c("gray30", col_vector[1:15])
+
+g <- ggplot(ft_tmp %>% mutate(name = factor(new_name, levels = sample_ord, ordered = TRUE)),
+            aes(new_name, value)) +
+  geom_col(aes(fill = taxa_label), position = "stack") + 
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cols) + 
+  guides(fill=guide_legend(ncol =1)) + 
+  labs(x = "", y = "Read counts") + 
+  theme_bw() + theme(#aspect.ratio = 0.8,
+    legend.position="right",
+    panel.background = element_rect(fill = NA),
+    strip.text = element_text(size=12,color="black",face='bold'),
+    axis.title = element_text(size=12,color="black",face='bold'),
+    axis.text = element_text(size=12,color="black",face='bold'),
+    axis.text.x = element_markdown(size=12, face='bold',angle=90,vjust = 0.5, hjust = 1, color = sample_col),
+    axis.text.y = element_text(size=12,color="black",face='bold'),
+    legend.text = element_text(size=12,color="black",face='bold'),
+    legend.title = element_blank(),
+    title = element_text(size=12,color="black",face='bold'))
+
+ggsave(filename = paste0(temp_out, "read_count_fungi_genus_per_sample.pdf"), device = cairo_pdf, 
+       plot = g, width = 14, height = 8, units = "in", dpi = 300)  
+
+#### RA
+ft_ITS_clean_wk <- ft_ITS_clean_wk[, colSums(ft_ITS_clean_wk)>0]
+ra_ITS_clean_wk <- sweep(ft_ITS_clean_wk, 2, colSums(ft_ITS_clean_wk), `/`)
+
+ra_ITS_clean_wk_g <- ra_ITS_clean_wk %>% rownames_to_column(var = "id") %>% 
+  left_join(taxa_ITS, by = "id") %>% 
+  mutate(taxa_label = str_c(Phylum, Genus_l, sep = ";"))
+
+ra_ITS_clean_wk_g <- ra_ITS_clean_wk_g %>% select(-c(id,Kingdom:Species_l)) %>% 
+  select(taxa_label ,dplyr::everything()) %>% 
+  group_by(taxa_label) %>%
+  summarise(across(everything(), sum),
+            .groups = 'drop') %>% 
+  ungroup() %>% 
+  column_to_rownames(var = "taxa_label")
+
+top_id <- (rowMeans(ra_ITS_clean_wk_g) %>% sort(decreasing = TRUE) %>% names())[1:15]
+
+ra_tmp <- ra_ITS_clean_wk_g %>% rownames_to_column(var = "taxa_label") %>% 
+  mutate(taxa_label = ifelse(taxa_label %in% top_id, taxa_label, "other")) %>% 
+  group_by(taxa_label) %>%
+  summarise(across(everything(), sum),
+            .groups = 'drop') %>% 
+  ungroup() %>% 
+  pivot_longer(cols = -taxa_label) %>% 
+  left_join(meta_both, by = c("name" = "SampleID_clean")) %>% 
+  arrange(Continent, Country) 
+
+sample_ord <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% pull(new_name)
+sample_col <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% 
+  mutate(color = Country_color[Country]) %>% pull(color)
+
+col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
+               brewer.pal(8, "Set2"), brewer.pal(7, "Accent")) %>% unique()
+cols = c("gray30", col_vector[1:15])
+
+g <- ggplot(ra_tmp %>% mutate(new_name = factor(new_name, levels = sample_ord, ordered = TRUE)),
+            aes(new_name, value)) +
+  geom_col(aes(fill = taxa_label), position = "stack") +
+  scale_fill_manual(values = cols) + 
+  scale_y_continuous(expand = c(0,0)) +
+  guides(fill=guide_legend(ncol =1)) + 
+  labs(x = "", y = "Read counts") + 
+  theme_bw() + theme(#aspect.ratio = 0.8,
+    legend.position="right",
+    panel.background = element_rect(fill = NA),
+    strip.text = element_text(size=12,color="black",face='bold'),
+    axis.title = element_text(size=12,color="black",face='bold'),
+    axis.text = element_text(size=12,color="black",face='bold'),
+    axis.text.x = element_markdown(size=12, face='bold',angle=90,vjust = 0.5, hjust = 1, color = sample_col),
+    axis.text.y = element_text(size=12,color="black",face='bold'),
+    legend.text = element_text(size=12,color="black",face='bold'),
+    legend.title = element_text(size=12,color="black",face='bold'),
+    title = element_text(size=12,color="black",face='bold'))
+
+ggsave(filename = paste0(temp_out, "RA_fungi_genus_per_sample.pdf"), device = cairo_pdf, 
+       plot = g, width = 14, height = 8, units = "in", dpi = 300)  
+
 ```
 
 ### prevalence Species
 ```{r}
 dat <- data.frame(pre = rowSums(ft_ITS_clean_wk_s>0), taxa = rownames(ft_ITS_clean_wk_s))
+write_tsv(dat, paste0(temp_out, "prev_fungi_species.tsv"))
 
-write_tsv(dat, paste0(temp_out, "prev_fungi.tsv"))
+dat <- data.frame(pre = rowSums(ft_ITS_clean_wk_g>0), taxa = rownames(ft_ITS_clean_wk_g))
+write_tsv(dat, paste0(temp_out, "prev_fungi_genus.tsv"))
 
 ```
 
