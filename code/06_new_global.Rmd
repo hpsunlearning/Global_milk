@@ -1022,7 +1022,7 @@ for (taxrank in c("ASV", "Species","Genus")){
     taxa_temp <- taxa %>% mutate(taxa_long = str_c(Phylum,Species_l, sep = ";"))
   }else if(taxrank == "Genus"){
     ft <- otu_table(phylo_global_g@otu_table) %>% as.data.frame()
-    taxa_temp <- taxa %>% mutate(taxa_long = str_c(phylum,Genus_l, sep = ";"))
+    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Phylum,Genus_l, sep = ";"))
   }
   n = nrow(meta_global_rf)
   ft2 <- t(ft)
@@ -1060,7 +1060,7 @@ for (taxrank in c("ASV", "Species", "Genus")){
     taxa_temp <- taxa %>% mutate(taxa_long = str_c(Phylum,Species_l, sep = ";"))
   }else if(taxrank == "Genus"){
     ft <- otu_table(phylo_global_g@otu_table) %>% as.data.frame()
-    taxa_temp <- taxa %>% mutate(taxa_long = str_c(phylum,Genus_l, sep = ";"))
+    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Phylum,Genus_l, sep = ";"))
   }
   
   select_top_pre <- read.csv(paste0(temp_out,"Prevalence_", taxrank, "_in_global_by_Country.csv"))
@@ -1219,13 +1219,13 @@ library(ComplexHeatmap)
 for (taxrank in c("Genus", "ASV", "Species")){
   if(taxrank == "ASV"){
     phylotmp <- phylo_global_decontam_clean_rf
-    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Family,Genus,Species,ASV, sep = ";"))
+    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Phylum,Species_l,ASV, sep = ";"))
   }else if(taxrank == "Species"){
     phylotmp <- phylo_global_s
-    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Family,Genus,Species, sep = ";"))
+    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Phylum,Species_l, sep = ";"))
   }else if(taxrank == "Genus"){
     phylotmp <- phylo_global_g
-    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Family,Genus, sep = ";"))
+    taxa_temp <- taxa %>% mutate(taxa_long = str_c(Phylum,Genus_l, sep = ";"))
   }
   #trace(ancombc2, edit = TRUE)
   #line 66 data = as.data.frame(meta_data)
