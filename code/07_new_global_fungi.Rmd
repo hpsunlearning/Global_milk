@@ -18,6 +18,7 @@ library(ggtext)
 library(glue)
 library(RColorBrewer)
 library(tidyverse)
+options(scipen=999)
 ```
 
 ## prepare (run first time only)
@@ -204,8 +205,8 @@ ft_tmp <- ft_ITS_clean_wk_s %>% rownames_to_column(var = "taxa_label") %>%
 sample_ord <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% pull(new_name)
 sample_col <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% 
   mutate(color = Country_color[Country]) %>% pull(color)
-col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
-               brewer.pal(8, "Set2"), brewer.pal(7, "Accent")) %>% unique()
+
+col_vector = c(brewer.pal(12, "Set3"), brewer.pal(9, "Set1"))
 cols = c("gray30", col_vector[1:20])
 
 g <- ggplot(ft_tmp %>% mutate(name = factor(new_name, levels = sample_ord, ordered = TRUE)),
@@ -261,8 +262,8 @@ ra_tmp <- ra_ITS_clean_wk_s %>% rownames_to_column(var = "taxa_label") %>%
 sample_ord <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% pull(new_name)
 sample_col <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% 
   mutate(color = Country_color[Country]) %>% pull(color)
-col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
-               brewer.pal(8, "Set2"), brewer.pal(7, "Accent")) %>% unique()
+
+col_vector = c(brewer.pal(12, "Set3"), brewer.pal(9, "Set1"))
 cols = c("gray30", col_vector[1:20])
 
 g <- ggplot(ra_tmp %>% mutate(name = factor(new_name, levels = sample_ord, ordered = TRUE)),
@@ -319,8 +320,7 @@ sample_ord <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% pull
 sample_col <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% 
   mutate(color = Country_color[Country]) %>% pull(color)
 
-col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
-               brewer.pal(8, "Set2"), brewer.pal(7, "Accent")) %>% unique()
+col_vector = c(brewer.pal(12, "Set3"), brewer.pal(9, "Set1"))
 cols = c("gray30", col_vector[1:15])
 
 g <- ggplot(ft_tmp %>% mutate(name = factor(new_name, levels = sample_ord, ordered = TRUE)),
@@ -377,8 +377,7 @@ sample_ord <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% pull
 sample_col <- meta_both %>% arrange(Continent, Country, SampleID_clean) %>% 
   mutate(color = Country_color[Country]) %>% pull(color)
 
-col_vector = c(brewer.pal(12, "Set3"), brewer.pal(12, "Paired"), 
-               brewer.pal(8, "Set2"), brewer.pal(7, "Accent")) %>% unique()
+col_vector = c(brewer.pal(12, "Set3"), brewer.pal(9, "Set1"))
 cols = c("gray30", col_vector[1:15])
 
 g <- ggplot(ra_tmp %>% mutate(new_name = factor(new_name, levels = sample_ord, ordered = TRUE)),
@@ -405,13 +404,14 @@ ggsave(filename = paste0(temp_out, "RA_fungi_genus_per_sample.pdf"), device = ca
 
 ```
 
-### prevalence Species
+### prevalence
 ```{r}
-dat <- data.frame(pre = rowSums(ft_ITS_clean_wk_s>0), taxa = rownames(ft_ITS_clean_wk_s))
-write_tsv(dat, paste0(temp_out, "prev_fungi_species.tsv"))
+options(scipen=999)
+dat <- data.frame(taxa = rownames(ra_ITS_clean_wk_s), pre = rowSums(ra_ITS_clean_wk_s>0), abundance = rowMeans(ra_ITS_clean_wk_s))
+write.table(dat, file = paste0(temp_out, "prev_abn_fungi_species.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
 
-dat <- data.frame(pre = rowSums(ft_ITS_clean_wk_g>0), taxa = rownames(ft_ITS_clean_wk_g))
-write_tsv(dat, paste0(temp_out, "prev_fungi_genus.tsv"))
+dat <- data.frame(taxa = rownames(ra_ITS_clean_wk_g), pre = rowSums(ra_ITS_clean_wk_g>0), abundance = rowMeans(ra_ITS_clean_wk_g))
+write.table(dat, file = paste0(temp_out, "prev_abn_fungi_genus.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
 
 ```
 

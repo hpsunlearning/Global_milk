@@ -19,6 +19,7 @@ library(ggtext)
 library(glue)
 library(tidyverse)
 library(patchwork)
+options(scipen=999)
 ```
 
 ## prepare (run first time only)
@@ -810,7 +811,7 @@ for(dd in c("uu","wu","bray","jaccard")){
     geom_point(data = wdat, aes(x = PC1, y = PC2, color = Continent), size = 1, alpha = 0.5) + 
     geom_segment(data = wdat, aes(x = PC1, y = PC2, xend = PC1.c, yend = PC2.c), size = 0.2, alpha = 0.5) + 
     geom_point(size = 4,shape = 21, color = "black", aes(fill = Continent)) + 
-    geom_text_repel(aes(label = Country), color = "black") + 
+    geom_text_repel(aes(label = Country), color = "black", max.overlaps = 20) + 
     scale_color_manual(values = Continent_color, aesthetics = c("color","fill")) + 
     labs(x = x_lab, y = y_lab, title = "") +
     theme_bw() + theme(#aspect.ratio = 1,
@@ -1422,6 +1423,7 @@ ft_ra <- ft_ra %>% rownames_to_column(var = "id") %>% left_join(taxa, by = "id")
 ft_log <- log10((ft + 0.5)/colSums(ft)[1])
 ft_log <- ft_log %>% rownames_to_column(var = "id") %>% left_join(taxa, by = "id")
 ##log is better
+g_lst <- list()
 for (gg in diff_taxa){
   for (dtype in c("log", "ra")){
     if(dtype == "log"){
@@ -1456,7 +1458,7 @@ for (gg in diff_taxa){
       geom_boxplot(aes(color = Country, fill = Country), alpha = 0.6,  outlier.alpha = 0) + 
       geom_point(aes(color = Country), position = position_jitterdodge()) + 
       geom_text(data = res_summary, 
-                aes(x =  Country, y = 1.08 * Max, label = KW_group)) +
+                aes(x =  Country, y = 1.15 * Max, label = KW_group)) +
       # geom_text(data = res_summary, 
       #           aes(x =  Country, y = -0.01, label = N_lab)) +
       scale_color_manual(values = Country_color, aesthetics = c("color","fill")) + 
@@ -1474,10 +1476,22 @@ for (gg in diff_taxa){
         legend.title = element_text(size=12,color="black",face='bold'),
         title = element_text(size=12,color="black",face='bold'))
     
+    if(dtype == "log"){g_lst[[gg]] <- g}
     ggsave(filename = paste0(temp_out, gg,"_by_Country_", dtype, "_ordered.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 7, units = "in", dpi = 300) 
+           plot = g, width = 5, height = 5, units = "in", dpi = 300) 
   }
 }
+
+p <- g_lst[[1]]
+for(i in c(2:length(g_lst))){
+  p <- p + g_lst[[i]]
+}
+p + plot_layout(ncol = 4)
+ggsave(filename = paste0(temp_out,"diff_genus_by_Country_log_ordered.pdf"), device = cairo_pdf, 
+       plot = p, width = 20, height = 15, units = "in", dpi = 300) 
+
+
+
 
 ```
 

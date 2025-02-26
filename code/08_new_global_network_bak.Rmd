@@ -29,8 +29,7 @@ library(tidyverse)
 ```{r}
 load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global_ITS.Rdata")
 load("~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/Global.Rdata")
-temp_out = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/network2/"
-meta_both <- meta_both %>% filter(Project != "Covid Mom", SampleID != "BR34.1") 
+temp_out = "~/Library/CloudStorage/Dropbox/rutgers/20220606_RUN41_milk/Data/output/global/network/"
 ```
 
 ## function
@@ -198,9 +197,11 @@ ft_its_wk_g <- aggregate_ft(ft = ft_its_wk, taxa = taxa_ITS, L = "Genus")
 ft_its_wk_g <- ft_its_wk_g[,colSums(ft_its_wk_g)>0]
 ra_its_wk_g <- sweep(ft_its_wk_g, 1, rowSums(ft_its_wk_g), `/`)
 
+meta_both <- meta_global %>% filter(SampleID_clean %in% rownames(ft_its_wk)) %>% 
+  filter(Project != "Covid Mom")
 
 # 16S
-ft_16s_wk <- phylo_global_decontam_clean_rf@otu_table@.Data %>% t() %>% 
+ft_16s_wk <- phylo_global_decontam_clean@otu_table@.Data %>% t() %>% 
   as.data.frame() %>% rownames_to_column(var = "SampleID") %>% 
   mutate(SampleID_clean = str_remove_all(SampleID, " ")) %>% 
   filter(SampleID_clean %in% (meta_global %>% pull(SampleID_clean))) %>% 
@@ -225,18 +226,17 @@ prevalence_cutoff <- 0.1
 
 ft_its_wk_g_filter <- filter_ra_pre(ft_mt = ft_its_wk_g, ra_mt = ra_its_wk_g, abundance_cutoff = abundance_cutoff, prevalence_cutoff = prevalence_cutoff)
 ft_its_wk_g_filter <- ft_its_wk_g_filter  %>% as.data.frame() %>% 
-  rownames_to_column(var = "SampleID_clean") %>% arrange(SampleID_clean) %>% filter(SampleID_clean != "BR34.1")
+  rownames_to_column(var = "SampleID_clean") %>% arrange(SampleID_clean)
 
 ft_16s_wk_g_filter <- filter_ra_pre(ft_mt = ft_16s_wk_g, ra_mt = ra_16s_wk_g, abundance_cutoff = abundance_cutoff, prevalence_cutoff = prevalence_cutoff)
 ft_16s_wk_g_filter <- ft_16s_wk_g_filter %>% as.data.frame() %>% 
-  rownames_to_column(var = "SampleID_clean") %>% arrange(SampleID_clean) %>% filter(SampleID_clean != "BR34.1")
+  rownames_to_column(var = "SampleID_clean") %>% arrange(SampleID_clean)  
 
 res <- list()
 
-mt_wk <- ft_16s_wk_g_filter %>% column_to_rownames(var = "SampleID_clean") %>% as.matrix()
-
+mt_wk <- ft_16s_wk_g_filter %>% column_to_rownames(var = "SampleID_clean") %>% 
+  as.matrix()
 res[["16S All"]] <- run_sparcc(mt_wk = mt_wk, R = 1000)
-
 for(ct in c("AFRICA","AMERICA","EUROPE")){
   mt_wkk <- mt_wk %>% as.data.frame() %>% rownames_to_column(var = "SampleID_clean") %>% 
     filter(SampleID_clean %in% (meta_global %>% filter(Continent == ct) %>% pull(SampleID_clean))) %>% 
@@ -261,7 +261,6 @@ for(ct in c("AFRICA", "AMERICA")){
   res[[paste0("Both ",ct)]] <- run_sparcc(mt_wk = mt_wkk, R = 1000)
 }
 
-save(res, file = paste0(temp_out,"network_20250226.Rdata"))
 ```
 
 ### plot
