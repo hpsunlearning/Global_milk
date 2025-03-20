@@ -76,21 +76,30 @@ filter_ra_pre <- function(ft_mt, ra_mt, abundance_cutoff = 0.001, prevalence_cut
   ft_filter
 }
 
-run_sparcc <- function(mt_wk, iter = 20, inner_iter = 10, th = 0.1, R = 100, ncpus = 10){
+run_sparcc <- function(mt_wk, iter = 20, inner_iter = 10, th = 0.1, R = 100, ncpus = 10, seed = 1){
   
-  scc0 <- sparcc(mt_wk, iter = 20, inner_iter = 10, th = 0.1)
+  scc0 <- sparcc(mt_wk, iter = iter, inner_iter = inner_iter, th = th)
   sparcc_cors = scc0$Cor
   colnames(sparcc_cors) = colnames(mt_wk)
   rownames(sparcc_cors) = colnames(mt_wk)
   
-  sparcc_boot_res <- sparccboot(mt_wk, R = 100, ncpus = 10)
+  set.seed(seed = seed)
+  sparcc_boot_res <- sparccboot(mt_wk, R = R, ncpus = ncpus)
   sparcc_boot_pval <- pval.sparccboot(sparcc_boot_res, sided = "both")
+  
   sparcc_pval <- diag(0.5, nrow = dim(sparcc_cors)[1], ncol = dim(sparcc_cors)[1])
   sparcc_pval[upper.tri(sparcc_pval, diag=FALSE)] <- sparcc_boot_pval$pvals
   sparcc_pval <- sparcc_pval + t(sparcc_pval)
   colnames(sparcc_pval) = colnames(mt_wk)
   rownames(sparcc_pval) = colnames(mt_wk)
-  res = list(cor = sparcc_cors, pval = sparcc_pval)
+  
+  sparcc_boot_cors <- diag(0.5, nrow = dim(sparcc_cors)[1], ncol = dim(sparcc_cors)[1])
+  sparcc_boot_cors[upper.tri(sparcc_boot_cors, diag=FALSE)] <- sparcc_boot_pval$cors
+  sparcc_boot_cors <- sparcc_boot_cors + t(sparcc_boot_cors)
+  colnames(sparcc_boot_cors) = colnames(mt_wk)
+  rownames(sparcc_boot_cors) = colnames(mt_wk)
+  
+  res = list(cor = sparcc_boot_cors, pval = sparcc_pval)
   res
 }
 
@@ -234,13 +243,14 @@ ft_16s_wk_g_filter <- ft_16s_wk_g_filter %>% as.data.frame() %>%
 res <- list()
 
 mt_wk <- ft_16s_wk_g_filter %>% column_to_rownames(var = "SampleID_clean") %>% as.matrix()
-
+set.seed(2025)
 res[["16S All"]] <- run_sparcc(mt_wk = mt_wk, R = 1000)
 
 for(ct in c("AFRICA","AMERICA","EUROPE")){
   mt_wkk <- mt_wk %>% as.data.frame() %>% rownames_to_column(var = "SampleID_clean") %>% 
     filter(SampleID_clean %in% (meta_global %>% filter(Continent == ct) %>% pull(SampleID_clean))) %>% 
     column_to_rownames(var = "SampleID_clean") %>% as.matrix()
+  set.seed(2025)
   res[[paste0("16S ",ct)]] <- run_sparcc(mt_wk = mt_wkk, R = 1000)
 }  
 
@@ -252,20 +262,23 @@ mt_wk <- ft_its_wk_g_filter %>%
   left_join(aa, by = "SampleID_clean")  %>% 
   column_to_rownames(var = "SampleID_clean") %>% 
   as.matrix()
+set.seed(2025)
 res[["Both All"]] <- run_sparcc(mt_wk = mt_wk, R = 1000)
 
 for(ct in c("AFRICA", "AMERICA")){
   mt_wkk <- mt_wk %>% as.data.frame() %>% rownames_to_column(var = "SampleID_clean") %>% 
     filter(SampleID_clean %in% (meta_both %>% filter(Continent == ct) %>% pull(SampleID_clean))) %>% 
     column_to_rownames(var = "SampleID_clean") %>% as.matrix()
+  set.seed(2025)
   res[[paste0("Both ",ct)]] <- run_sparcc(mt_wk = mt_wkk, R = 1000)
 }
 
-save(res, file = paste0(temp_out,"network_20250226.Rdata"))
+save(res, file = paste0(temp_out,"network_20250320.Rdata"))
 ```
 
 ### plot
 ```{r}
+load(file = paste0(temp_out,"network_20250320.Rdata"))
 k_color = c("Fungi"="#fc8d62", "Bacteria"="#8da0cb", "Archaea"="#66c2a5")
 
 for (nn in names(res)){
@@ -284,6 +297,7 @@ for (nn in names(res)){
   
   #for (ll in c('kk', 'dh', 'drl','fr','gem','circle', 'graphopt', 'grid','lgl','mds','randomly')){
   for (ll in c('fr','circle')){
+    set.seed(2025)
     g <- ggraph(gg, layout = ll) +
       geom_edge_link(aes(colour = col)) +
       geom_node_point(aes(color = col_k), size = 3) +
@@ -293,12 +307,104 @@ for (nn in names(res)){
       labs(title = nn) + 
       theme_graph(foreground = 'steelblue', fg_text_colour = 'white', base_family = 'Helvetica')
     
-    ggsave(g, file = paste0(temp_out, "sparcc_",nn,"_",ll,"_pval0.05_R1.pdf"), 
+    ggsave(g, file = paste0(temp_out, "sparcc_",nn,"_",ll,"_pval0.05_R6.pdf"), 
            device = pdf)
   }
 }
 
 ```
+
+
+## new same samples 16s and its
+### use sparcc ab 0.01, pre 0.1, cor 0.3,
+```{r}
+abundance_cutoff <- 0.01
+prevalence_cutoff <- 0.1
+
+ft_its_wk_g_filter <- filter_ra_pre(ft_mt = ft_its_wk_g, ra_mt = ra_its_wk_g, abundance_cutoff = abundance_cutoff, prevalence_cutoff = prevalence_cutoff)
+ft_its_wk_g_filter <- ft_its_wk_g_filter  %>% as.data.frame() %>% 
+  rownames_to_column(var = "SampleID_clean") %>% arrange(SampleID_clean) %>% filter(SampleID_clean != "BR34.1")
+
+ft_16s_wk_g_filter <- filter_ra_pre(ft_mt = ft_16s_wk_g, ra_mt = ra_16s_wk_g, abundance_cutoff = abundance_cutoff, prevalence_cutoff = prevalence_cutoff)
+ft_16s_wk_g_filter <- ft_16s_wk_g_filter %>% as.data.frame() %>% 
+  rownames_to_column(var = "SampleID_clean") %>% arrange(SampleID_clean) %>% filter(SampleID_clean != "BR34.1")
+
+ft_16s_wk_g_filter <- ft_16s_wk_g_filter %>% filter(SampleID_clean %in% ft_its_wk_g_filter$SampleID_clean)
+
+res <- list()
+
+mt_wk <- ft_16s_wk_g_filter %>% column_to_rownames(var = "SampleID_clean") %>% as.matrix()
+set.seed(2025)
+res[["16S All"]] <- run_sparcc(mt_wk = mt_wk, R = 1000)
+for(ct in c("AFRICA","AMERICA","EUROPE")){
+  mt_wkk <- mt_wk %>% as.data.frame() %>% rownames_to_column(var = "SampleID_clean") %>% 
+    filter(SampleID_clean %in% (meta_global %>% filter(Continent == ct) %>% pull(SampleID_clean))) %>% 
+    column_to_rownames(var = "SampleID_clean") %>% as.matrix()
+  set.seed(2025)
+  res[[paste0("16S ",ct)]] <- run_sparcc(mt_wk = mt_wkk, R = 1000)
+}  
+
+aa <- ft_16s_wk_g_filter %>% filter(SampleID_clean %in% ft_its_wk_g_filter$SampleID_clean) %>% 
+  column_to_rownames(var = "SampleID_clean")
+aa <- aa[,colSums(aa)>0] %>% 
+  rownames_to_column(var = "SampleID_clean")
+mt_wk <- ft_its_wk_g_filter %>% 
+  left_join(aa, by = "SampleID_clean")  %>% 
+  column_to_rownames(var = "SampleID_clean") %>% 
+  as.matrix()
+set.seed(2025)
+res[["Both All"]] <- run_sparcc(mt_wk = mt_wk, R = 1000)
+
+for(ct in c("AFRICA", "AMERICA")){
+  mt_wkk <- mt_wk %>% as.data.frame() %>% rownames_to_column(var = "SampleID_clean") %>% 
+    filter(SampleID_clean %in% (meta_both %>% filter(Continent == ct) %>% pull(SampleID_clean))) %>% 
+    column_to_rownames(var = "SampleID_clean") %>% as.matrix()
+  set.seed(2025)
+  res[[paste0("Both ",ct)]] <- run_sparcc(mt_wk = mt_wkk, R = 1000)
+}
+
+save(res, file = paste0(temp_out,"network_20250320_same_size.Rdata"))
+```
+
+### plot
+```{r}
+load(file = paste0(temp_out,"network_20250320_same_size.Rdata"))
+k_color = c("Fungi"="#fc8d62", "Bacteria"="#8da0cb", "Archaea"="#66c2a5")
+
+for (nn in names(res)){
+  cor_cutoff = 0.3
+  p_cutoff = 0.05
+  cor_sparcc = res[[nn]]$cor
+  pval_sparcc = res[[nn]]$pval
+  cor_sparcc[ pval_sparcc>=p_cutoff ] <- 0
+  cor_tidy <- cor_gather(cor_sparcc) 
+  cor_tidy <- cor_tidy %>% 
+    rename(from = var1, to = var2) %>% 
+    filter(abs(cor) > cor_cutoff) 
+  if(nrow(cor_tidy) == 0){next}
+  gdat <- tidy_graph_edge_node(cor_tidy = cor_tidy)
+  gg <- tbl_graph(directed = F, nodes = gdat$node, edges = gdat$edge) 
+  
+
+  for (ll in c('fr','circle')){
+    set.seed(2025)
+    g <- ggraph(gg, layout = ll) +
+      geom_edge_link(aes(colour = col)) +
+      geom_node_point(aes(color = col_k), size = 3) +
+      geom_node_text(aes(label = label3), repel = TRUE) + 
+      scale_color_manual(values = k_color, name = "") +
+      scale_edge_color_manual(values = c("pos"="green", "neg"="red"), name = "") + 
+      labs(title = nn) + 
+      theme_graph(foreground = 'steelblue', fg_text_colour = 'white', base_family = 'Helvetica')
+    
+    ggsave(g, file = paste0(temp_out, "sparcc_new_same_size_",nn,"_",ll,"_pval0.05_R6.pdf"), 
+           device = pdf)
+  }
+}
+
+```
+
+
 
 
 
