@@ -312,6 +312,15 @@ my_summarize2 = function(x){
 
 meta_global %>% summarise(my_summarize2(Seq_count)) %>% print()
 meta_global %>% summarise(my_summarize2(decontam_cleaned)) %>% print()
+
+
+sum(!is.na(meta_global_rf$Maternal_age))
+sum(!is.na(meta_global_rf$Maternal_weight_kg))
+sum(!is.na(meta_global_rf$Maternal_height_cm))
+sum(!is.na(meta_global_rf$Birth_mode))
+sum(!is.na(meta_global_rf$Time_post_partum_day))
+
+
 ```
 
 
@@ -417,7 +426,7 @@ alpha_lm_omega$padj = round(p.adjust(alpha_lm_omega$`Pr(>F)`), digits = 4)
 alpha_lm_omega$pvalue = round(alpha_lm_omega$`Pr(>F)`, digits = 4)
 write.csv(alpha_lm_omega, row.names = FALSE,
           file = paste0(temp_out,"alpha_lm_omega_Continent.csv"))
-##
+## Time_post_partum_day
 alpha_lm_coef <- map_dfr(metric, function(a){
   fit <- lm(as.formula(paste0(a, "  ~ Time_post_partum_day" )), data = dat)
   anova_fit <- anova(fit)
@@ -451,6 +460,147 @@ alpha_lm_omega$padj = round(p.adjust(alpha_lm_omega$`Pr(>F)`), digits = 4)
 alpha_lm_omega$pvalue = round(alpha_lm_omega$`Pr(>F)`, digits = 4)
 write.csv(alpha_lm_omega, row.names = FALSE,
           file = paste0(temp_out,"alpha_lm_omega_partum_day.csv"))
+
+## Maternal_age
+alpha_lm_coef <- map_dfr(metric, function(a){
+  fit <- lm(as.formula(paste0(a, "  ~ Maternal_age" )), data = dat)
+  anova_fit <- anova(fit)
+  sum_fit <- summary(fit)
+  effect_fit <- effectsize(anova_fit, "omega")
+  res_coef <- sum_fit$coefficients %>% as.data.frame() %>% 
+    rownames_to_column(var = "Var") %>% filter(Var != "(Intercept)")
+  res_anova <- right_join(anova_fit %>% as.data.frame() %>% rownames_to_column(var = "Parameter"),
+                          effect_fit %>% as.data.frame(), by = "Parameter")
+  res_coef$Metrics = a
+  res_coef
+})
+alpha_lm_coef$padj = round(p.adjust(alpha_lm_coef$`Pr(>|t|)`), digits = 4)
+alpha_lm_coef$pvalue = round(alpha_lm_coef$`Pr(>|t|)`, digits = 4)
+write.csv(alpha_lm_coef, row.names = FALSE,
+          file = paste0(temp_out,"alpha_lm_coef_Maternal_age.csv"))
+
+alpha_lm_omega <- map_dfr(metric, function(a){
+  fit <- lm(as.formula(paste0(a, "  ~ Maternal_age")), data = dat)
+  anova_fit <- anova(fit)
+  sum_fit <- summary(fit)
+  effect_fit <- effectsize(anova_fit, "omega")
+  res_coef <- sum_fit$coefficients %>% as.data.frame() %>% 
+    rownames_to_column(var = "Var") %>% filter(Var != "(Intercept)")
+  res_anova <- right_join(anova_fit %>% as.data.frame() %>% rownames_to_column(var = "Parameter"),
+                          effect_fit %>% as.data.frame(), by = "Parameter")
+  res_anova$Metrics = a
+  res_anova
+})
+alpha_lm_omega$padj = round(p.adjust(alpha_lm_omega$`Pr(>F)`), digits = 4)
+alpha_lm_omega$pvalue = round(alpha_lm_omega$`Pr(>F)`, digits = 4)
+write.csv(alpha_lm_omega, row.names = FALSE,
+          file = paste0(temp_out,"alpha_lm_omega_Maternal_age.csv"))
+
+## Birthmode
+alpha_lm_coef <- map_dfr(metric, function(a){
+  fit <- lm(as.formula(paste0(a, "  ~ Birth_mode" )), data = dat)
+  anova_fit <- anova(fit)
+  sum_fit <- summary(fit)
+  effect_fit <- effectsize(anova_fit, "omega")
+  res_coef <- sum_fit$coefficients %>% as.data.frame() %>% 
+    rownames_to_column(var = "Var") %>% filter(Var != "(Intercept)")
+  res_anova <- right_join(anova_fit %>% as.data.frame() %>% rownames_to_column(var = "Parameter"),
+                          effect_fit %>% as.data.frame(), by = "Parameter")
+  res_coef$Metrics = a
+  res_coef
+})
+alpha_lm_coef$padj = round(p.adjust(alpha_lm_coef$`Pr(>|t|)`), digits = 4)
+alpha_lm_coef$pvalue = round(alpha_lm_coef$`Pr(>|t|)`, digits = 4)
+write.csv(alpha_lm_coef, row.names = FALSE,
+          file = paste0(temp_out,"alpha_lm_coef_Birth_mode.csv"))
+
+alpha_lm_omega <- map_dfr(metric, function(a){
+  fit <- lm(as.formula(paste0(a, "  ~ Birth_mode")), data = dat)
+  anova_fit <- anova(fit)
+  sum_fit <- summary(fit)
+  effect_fit <- effectsize(anova_fit, "omega")
+  res_coef <- sum_fit$coefficients %>% as.data.frame() %>% 
+    rownames_to_column(var = "Var") %>% filter(Var != "(Intercept)")
+  res_anova <- right_join(anova_fit %>% as.data.frame() %>% rownames_to_column(var = "Parameter"),
+                          effect_fit %>% as.data.frame(), by = "Parameter")
+  res_anova$Metrics = a
+  res_anova
+})
+alpha_lm_omega$padj = round(p.adjust(alpha_lm_omega$`Pr(>F)`), digits = 4)
+alpha_lm_omega$pvalue = round(alpha_lm_omega$`Pr(>F)`, digits = 4)
+write.csv(alpha_lm_omega, row.names = FALSE,
+          file = paste0(temp_out,"alpha_lm_omega_Birth_mode.csv"))
+
+## Maternal_weight_kg
+alpha_lm_coef <- map_dfr(metric, function(a){
+  fit <- lm(as.formula(paste0(a, "  ~ Maternal_weight_kg" )), data = dat)
+  anova_fit <- anova(fit)
+  sum_fit <- summary(fit)
+  effect_fit <- effectsize(anova_fit, "omega")
+  res_coef <- sum_fit$coefficients %>% as.data.frame() %>% 
+    rownames_to_column(var = "Var") %>% filter(Var != "(Intercept)")
+  res_anova <- right_join(anova_fit %>% as.data.frame() %>% rownames_to_column(var = "Parameter"),
+                          effect_fit %>% as.data.frame(), by = "Parameter")
+  res_coef$Metrics = a
+  res_coef
+})
+alpha_lm_coef$padj = round(p.adjust(alpha_lm_coef$`Pr(>|t|)`), digits = 4)
+alpha_lm_coef$pvalue = round(alpha_lm_coef$`Pr(>|t|)`, digits = 4)
+write.csv(alpha_lm_coef, row.names = FALSE,
+          file = paste0(temp_out,"alpha_lm_coef_Maternal_weight_kg.csv"))
+
+alpha_lm_omega <- map_dfr(metric, function(a){
+  fit <- lm(as.formula(paste0(a, "  ~ Maternal_weight_kg")), data = dat)
+  anova_fit <- anova(fit)
+  sum_fit <- summary(fit)
+  effect_fit <- effectsize(anova_fit, "omega")
+  res_coef <- sum_fit$coefficients %>% as.data.frame() %>% 
+    rownames_to_column(var = "Var") %>% filter(Var != "(Intercept)")
+  res_anova <- right_join(anova_fit %>% as.data.frame() %>% rownames_to_column(var = "Parameter"),
+                          effect_fit %>% as.data.frame(), by = "Parameter")
+  res_anova$Metrics = a
+  res_anova
+})
+alpha_lm_omega$padj = round(p.adjust(alpha_lm_omega$`Pr(>F)`), digits = 4)
+alpha_lm_omega$pvalue = round(alpha_lm_omega$`Pr(>F)`, digits = 4)
+write.csv(alpha_lm_omega, row.names = FALSE,
+          file = paste0(temp_out,"alpha_lm_omega_Maternal_weight_kg.csv"))
+
+## All
+alpha_lm_coef <- map_dfr(metric, function(a){
+  fit <- lm(as.formula(paste0(a, "  ~ Birth_mode + Maternal_weight_kg + Maternal_age +  Time_post_partum_day + Country" )), data = dat)
+  anova_fit <- anova(fit)
+  sum_fit <- summary(fit)
+  effect_fit <- effectsize(anova_fit, "omega")
+  res_coef <- sum_fit$coefficients %>% as.data.frame() %>% 
+    rownames_to_column(var = "Var") %>% filter(Var != "(Intercept)")
+  res_anova <- right_join(anova_fit %>% as.data.frame() %>% rownames_to_column(var = "Parameter"),
+                          effect_fit %>% as.data.frame(), by = "Parameter")
+  res_coef$Metrics = a
+  res_coef
+})
+alpha_lm_coef$padj = round(p.adjust(alpha_lm_coef$`Pr(>|t|)`), digits = 4)
+alpha_lm_coef$pvalue = round(alpha_lm_coef$`Pr(>|t|)`, digits = 4)
+write.csv(alpha_lm_coef, row.names = FALSE,
+          file = paste0(temp_out,"alpha_lm_coef_All.csv"))
+
+alpha_lm_omega <- map_dfr(metric, function(a){
+  fit <- lm(as.formula(paste0(a, "  ~ Birth_mode + Maternal_weight_kg + Maternal_age +  Time_post_partum_day + Country")), data = dat)
+  anova_fit <- anova(fit)
+  sum_fit <- summary(fit)
+  effect_fit <- effectsize(anova_fit, "omega")
+  res_coef <- sum_fit$coefficients %>% as.data.frame() %>% 
+    rownames_to_column(var = "Var") %>% filter(Var != "(Intercept)")
+  res_anova <- right_join(anova_fit %>% as.data.frame() %>% rownames_to_column(var = "Parameter"),
+                          effect_fit %>% as.data.frame(), by = "Parameter")
+  res_anova$Metrics = a
+  res_anova
+})
+alpha_lm_omega$padj = round(p.adjust(alpha_lm_omega$`Pr(>F)`), digits = 4)
+alpha_lm_omega$pvalue = round(alpha_lm_omega$`Pr(>F)`, digits = 4)
+write.csv(alpha_lm_omega, row.names = FALSE,
+          file = paste0(temp_out,"alpha_lm_omega_All.csv"))
+
 ``` 
 
 
@@ -727,27 +877,98 @@ for(dd in c("uu","wu","bray","jaccard")){
   wmeta = meta_global %>% filter(SampleID %in% labels(wdist))
   wdist <- dist_subset(wdist, wmeta$SampleID) 
   print(dd)
-  ## Country
-  disper <- betadisper(wdist, wmeta$Country)
-  disper_ova <- anova(disper)
-  disper_HSD <- TukeyHSD(disper)
-  write.csv(disper_ova, file = paste0(temp_out,"disper_anova_", dd, "_Country.csv"), quote = F)
-  write.csv(disper_HSD$group, file = paste0(temp_out,"disper_HSD_", dd, "_Country.csv"), quote = F)
+  # ## Country
+  # disper <- betadisper(wdist, wmeta$Country)
+  # disper_ova <- anova(disper)
+  # disper_HSD <- TukeyHSD(disper)
+  # write.csv(disper_ova, file = paste0(temp_out,"disper_anova_", dd, "_Country.csv"), quote = F)
+  # write.csv(disper_HSD$group, file = paste0(temp_out,"disper_HSD_", dd, "_Country.csv"), quote = F)
+  # 
+  # per <- adonis2(wdist ~ Country, data = wmeta, by = "margin")
+  # res <-  calcOmega2_dm(per)
+  # write.csv(res, file = paste0(temp_out,"adonis_test_", dd, "_Country.csv"), quote = F, row.names = F)
+  # 
+  # ## Continent
+  # disper <- betadisper(wdist, wmeta$Continent)
+  # disper_ova <- anova(disper)
+  # disper_HSD <- TukeyHSD(disper)
+  # write.csv(disper_ova, file = paste0(temp_out,"disper_anova_", dd, "_Continent.csv"), quote = F)
+  # write.csv(disper_HSD$group, file = paste0(temp_out,"disper_HSD_", dd, "_Continent.csv"), quote = F)
+  # 
+  # per <- adonis2(wdist ~ Continent, data = wmeta, by = "margin")
+  # res <-calcOmega2_dm(per)
+  # write.csv(res, file = paste0(temp_out,"adonis_test_", dd, "_Continent.csv"), quote = F, row.names = F)
   
-  per <- adonis2(wdist ~ Country, data = wmeta, by = "margin")
-  res <-  calcOmega2_dm(per)
-  write.csv(res, file = paste0(temp_out,"adonis_test_", dd, "_Country.csv"), quote = F, row.names = F)
+  # ## postpartum 
+  # wwmeta <- wmeta %>% filter(!is.na(Time_post_partum_day))
+  # wwdist <- dist_subset(wdist, wwmeta$SampleID )
+  # disper <- betadisper(wwdist, wwmeta$Time_post_partum_day)
+  # disper_ova <- anova(disper)
+  # disper_HSD <- TukeyHSD(disper)
+  # write.csv(disper_ova, file = paste0(temp_out,"disper_anova_", dd, "_postpartum.csv"), quote = F)
+  # write.csv(disper_HSD$group, file = paste0(temp_out,"disper_HSD_", dd, "_postpartum.csv"), quote = F)
+  # 
+  # per <- adonis2(wwdist ~ Time_post_partum_day, data = wwmeta, by = "margin")
+  # res <-calcOmega2_dm(per)
+  # write.csv(res, file = paste0(temp_out,"adonis_test_", dd, "_postpartum.csv"), quote = F, row.names = F)
   
-  ## Continent
-  disper <- betadisper(wdist, wmeta$Continent)
-  disper_ova <- anova(disper)
-  disper_HSD <- TukeyHSD(disper)
-  write.csv(disper_ova, file = paste0(temp_out,"disper_anova_", dd, "_Continent.csv"), quote = F)
-  write.csv(disper_HSD$group, file = paste0(temp_out,"disper_HSD_", dd, "_Continent.csv"), quote = F)
+  #   ## Maternal_age
+  # wwmeta <- wmeta %>% filter(!is.na(Maternal_age))
+  # wwdist <- dist_subset(wdist, wwmeta$SampleID )
+  # disper <- betadisper(wwdist, wwmeta$Maternal_age)
+  # disper_ova <- anova(disper)
+  # disper_HSD <- TukeyHSD(disper)
+  # write.csv(disper_ova, file = paste0(temp_out,"disper_anova_", dd, "_Maternal_age.csv"), quote = F)
+  # write.csv(disper_HSD$group, file = paste0(temp_out,"disper_HSD_", dd, "_Maternal_age.csv"), quote = F)
+  # 
+  # per <- adonis2(wwdist ~ Maternal_age, data = wwmeta, by = "margin")
+  # res <-calcOmega2_dm(per)
+  # write.csv(res, file = paste0(temp_out,"adonis_test_", dd, "_Maternal_age.csv"), quote = F, row.names = F)
+  # 
+  # ## Maternal_weight_kg
+  # wwmeta <- wmeta %>% filter(!is.na(Maternal_weight_kg))
+  # wwdist <- dist_subset(wdist, wwmeta$SampleID )
+  # disper <- betadisper(wwdist, wwmeta$Maternal_weight_kg)
+  # disper_ova <- anova(disper)
+  # disper_HSD <- TukeyHSD(disper)
+  # write.csv(disper_ova, file = paste0(temp_out,"disper_anova_", dd, "_Maternal_weight_kg.csv"), quote = F)
+  # write.csv(disper_HSD$group, file = paste0(temp_out,"disper_HSD_", dd, "_Maternal_weight_kg.csv"), quote = F)
+  # 
+  # per <- adonis2(wwdist ~ Maternal_weight_kg, data = wwmeta, by = "margin")
+  # res <-calcOmega2_dm(per)
+  # write.csv(res, file = paste0(temp_out,"adonis_test_", dd, "_Maternal_weight_kg.csv"), quote = F, row.names = F) 
+  #   ## Birth_mode
+  # wwmeta <- wmeta %>% filter(!is.na(Birth_mode))
+  # wwdist <- dist_subset(wdist, wwmeta$SampleID )
+  # disper <- betadisper(wwdist, wwmeta$Birth_mode)
+  # disper_ova <- anova(disper)
+  # disper_HSD <- TukeyHSD(disper)
+  # write.csv(disper_ova, file = paste0(temp_out,"disper_anova_", dd, "_Birth_mode.csv"), quote = F)
+  # write.csv(disper_HSD$group, file = paste0(temp_out,"disper_HSD_", dd, "_Birth_mode.csv"), quote = F)
+  # 
+  # per <- adonis2(wwdist ~ Birth_mode, data = wwmeta, by = "margin")
+  # res <-calcOmega2_dm(per)
+  # write.csv(res, file = paste0(temp_out,"adonis_test_", dd, "_Birth_mode.csv"), quote = F, row.names = F)
   
-  per <- adonis2(wdist ~ Continent, data = wmeta, by = "margin")
+  ## all
+  wwmeta <- wmeta %>% filter(!is.na(Birth_mode), !is.na(Maternal_weight_kg),!is.na(Maternal_age), !is.na(Time_post_partum_day))
+  wwdist <- dist_subset(wdist, wwmeta$SampleID )
+  # disper <- betadisper(wwdist, wwmeta$Birth_mode)
+  # disper_ova <- anova(disper)
+  # disper_HSD <- TukeyHSD(disper)
+  # write.csv(disper_ova, file = paste0(temp_out,"disper_anova_", dd, "_Birth_mode.csv"), quote = F)
+  # write.csv(disper_HSD$group, file = paste0(temp_out,"disper_HSD_", dd, "_Birth_mode.csv"), quote = F)
+  
+  per <- adonis2(wwdist ~ Birth_mode + Maternal_weight_kg + Maternal_age +  Time_post_partum_day + Country, data = wwmeta, by = "margin")
   res <-calcOmega2_dm(per)
-  write.csv(res, file = paste0(temp_out,"adonis_test_", dd, "_Continent.csv"), quote = F, row.names = F)
+  write.csv(res, file = paste0(temp_out,"adonis_test_", dd, "_All_Country.csv"), quote = F, row.names = F)
+  
+  per <- adonis2(wwdist ~ Birth_mode + Maternal_weight_kg + Maternal_age +  Time_post_partum_day + Continent, data = wwmeta, by = "margin")
+  res <-calcOmega2_dm(per)
+  write.csv(res, file = paste0(temp_out,"adonis_test_", dd, "_All_Continent.csv"), quote = F, row.names = F)
+  
+  
+
 }
 ```
 
@@ -1383,6 +1604,15 @@ ft <- otu_table(phylo_global_g@otu_table) %>% as.data.frame() %>%
   dplyr::select(-c(id,Kingdom:ASV, taxa_long, Class_l:Family_l, Species_l)) %>% column_to_rownames(var = "Genus_l") %>% 
   t() %>% as.data.frame() %>% rownames_to_column(var = "SampleID") %>% 
   left_join(meta_global_rf %>% dplyr::select(SampleID, Country), by = "SampleID") 
+
+wdat <- ft %>% 
+  mutate(ra_g_Methanosphaera = g_Methanosphaera/depth,
+         ra_g_Methanobacterium = g_Methanobacterium/depth,
+         ra_g_Methanobrevibacter = g_Methanobrevibacter/depth,
+         none = g_Methanosphaera + g_Methanobacterium + g_Methanobrevibacter) %>% 
+  filter(none > 0)
+
+write_csv(wdat, file = paste0(temp_out,"Methanogen_RA.csv"))
 
 my_summarize2 <-  function(x){
   data.frame(
