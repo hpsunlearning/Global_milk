@@ -320,6 +320,33 @@ sum(!is.na(meta_global_rf$Maternal_height_cm))
 sum(!is.na(meta_global_rf$Birth_mode))
 sum(!is.na(meta_global_rf$Time_post_partum_day))
 
+my_summarize3 = function(x){
+  data.frame(
+    N = n(),
+    N.nna = sum(!is.na(x)),
+    Med = median(x, na.rm = T),
+    Mean = mean(x, na.rm = T),
+    SD = sd(x, na.rm = T)
+  )
+}
+
+meta_global %>% 
+  #group_by(Country) %>% 
+  summarise(my_summarize3(Maternal_age)) %>% 
+  #write_csv(.,file = paste0(temp_out,"Global_samples_Maternal_age.csv"))
+
+meta_global %>% group_by(Country) %>% 
+  summarise(my_summarize3(Maternal_weight_kg)) %>% 
+  write_csv(.,file = paste0(temp_out,"Global_samples_Maternal_weight_kg.csv"))
+
+meta_global %>% group_by(Country) %>% 
+  summarise(my_summarize3(Time_post_partum_day)) %>% 
+  write_csv(.,file = paste0(temp_out,"Global_samples_Time_post_partum_day.csv"))
+
+meta_global %>% group_by(Country) %>% 
+  count(Birth_mode) %>% pivot_wider(id_cols = Country, names_from = Birth_mode, values_from = n) %>% 
+  write_csv(.,file = paste0(temp_out,"Global_samples_Birth_mode.csv"))
+
 
 ```
 
@@ -1181,12 +1208,16 @@ temp <- res %>% dplyr::select(Taxa, RA) %>% group_by(Taxa) %>% dplyr::summarise(
 phylum_color = c(col_vector[1:(nrow(temp))],"Gray50")
 names(phylum_color) = c(temp$Taxa, "Other")
 
+dat_title <- meta_global_rf %>% count(Country) %>% 
+  mutate(title = str_c(Country, " N=",n))
+
 g_lst <- lapply(res$Country %>% unique(), function(x){
+  title_x <- dat_title %>% filter(Country == x) %>% pull(title)
   g <- ggplot(res %>% filter(Country == x),
               aes(x = "", y = RA, fill = Taxa)) + 
     geom_bar(stat = "identity", width = 1, color = "white") + 
     scale_fill_manual(values = phylum_color, name = "") + 
-    labs(title = x) + 
+    labs(title = title_x) + 
     coord_polar("y", start=0) + 
     theme_void() + theme(plot.title = element_text(face = "bold", size = 12, hjust = 0.5), legend.position = "none")  
 })
